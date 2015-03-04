@@ -29,11 +29,11 @@ static ssize_t printk_mode_show(struct kobject *kobj, struct kobj_attribute *att
 	// print current mode
 	if (printk_mode == 0)
 	{
-		return sprintf(buf, "printk mode: %d (disabled)", printk_mode);
+		return sprintf(buf, "%d", printk_mode);
 	}
 	else
 	{
-		return sprintf(buf, "printk mode: %d (enabled)", printk_mode);
+		return sprintf(buf, "%d", printk_mode);
 	}
 
 }
