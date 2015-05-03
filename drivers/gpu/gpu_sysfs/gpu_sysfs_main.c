@@ -8,8 +8,9 @@ static struct platform_device *gpu_sysfs_pdev;
  * Device attribute macros, linking functions with sysfs.
  * *********************************************************************
  * */
-DEVICE_ATTR(gpu_min_clock, 0444, gpu_min_clock_show, NULL);
-DEVICE_ATTR(gpu_max_clock, 0444, gpu_max_clock_show, NULL);
+DEVICE_ATTR(gpu_min_clock, 0644, gpu_min_clock_show, gpu_min_clock_write);
+DEVICE_ATTR(gpu_max_clock, 0644, gpu_max_clock_show, gpu_max_clock_write);
+DEVICE_ATTR(gpu_max_clock_screen_off, 0644, gpu_max_clock_screen_off_show, gpu_max_clock_screen_off_write);
 DEVICE_ATTR(gpu_busy, 0444, gpu_busy_show, NULL);
 DEVICE_ATTR(gpu_voltage, 0444, gpu_vol_show, NULL);
 DEVICE_ATTR(gpu_clock, 0444, gpu_freq_show, gpu_freq_write);
@@ -35,6 +36,12 @@ int gpu_sysfs_create_sysfs_files(struct device *dev)
 	}
 
 	if (device_create_file(dev, &dev_attr_gpu_max_clock)) 
+	{
+		pr_info("GPU_SYSFS: Couldn't create sysfs file %d\n", __LINE__);
+		goto out;
+	}
+
+	if (device_create_file(dev, &dev_attr_gpu_max_clock_screen_off)) 
 	{
 		pr_info("GPU_SYSFS: Couldn't create sysfs file %d\n", __LINE__);
 		goto out;
@@ -125,6 +132,7 @@ void gpu_sysfs_remove_sysfs_files(struct device *dev)
 	
 	device_remove_file(dev, &dev_attr_gpu_min_clock);
 	device_remove_file(dev, &dev_attr_gpu_max_clock);
+	device_remove_file(dev, &dev_attr_gpu_max_clock_screen_off);
 	device_remove_file(dev, &dev_attr_gpu_busy);
 	device_remove_file(dev, &dev_attr_gpu_voltage);
 	device_remove_file(dev, &dev_attr_gpu_clock);
