@@ -185,6 +185,9 @@ static inline unsigned long cpufreq_scale(unsigned long old, u_int div, u_int mu
 #define CPUFREQ_GOV_LIMITS	3
 #define CPUFREQ_GOV_POLICY_INIT	4
 #define CPUFREQ_GOV_POLICY_EXIT	5
+#define CPUFREQ_RELATION_L 0  /* lowest frequency at or above target */
+#define CPUFREQ_RELATION_H 1  /* highest frequency below or at target */
+#define CPUFREQ_RELATION_C 2  /* closest frequency to target */
 
 struct cpufreq_governor {
 	char	name[CPUFREQ_NAME_LEN];
