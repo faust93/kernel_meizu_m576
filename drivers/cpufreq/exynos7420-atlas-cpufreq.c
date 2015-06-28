@@ -355,12 +355,14 @@ static void __init set_volt_table_CA57(void)
 		max_support_idx_CA57 = L10; break;	/* 1.5GHz */
 	default :
 		max_support_idx_CA57 = L4;		/* 2.1GHz */
+		/*max_support_idx_CA57 = L0;*/		/* 2.5GHz */
 	}
 #else
 	max_support_idx_CA57 = L13;	/* 1.2 GHz */
 #endif
 
-	min_support_idx_CA57 = L17;	/* 800 MHz */
+	min_support_idx_CA57 = L23;	/* 200 MHz */
+	/*min_support_idx_CA57 = L17;*/	/* 800 MHz */
 
 	pr_info("CPUFREQ of CA57 max_freq : L%d %u khz\n", max_support_idx_CA57,
 		exynos7420_freq_table_CA57[max_support_idx_CA57].frequency);
