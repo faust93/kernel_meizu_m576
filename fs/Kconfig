@@ -75,6 +75,17 @@ config GENERIC_ACL
 
 menu "Caches"
 
+config ADAPTIVE_VFS_CACHE_PRESSURE
+	bool "Adaptive vfs_cache_pressure"
+	depends on POWERSUSPEND
+	default y
+	help
+	  Adaptively set the vfs_cache_pressure value during screen on, 
+	  whilst value is fixed in suspend. PowerSuspend driver required for 
+	  screen suspend/resume functions.
+
+	  If unsure, say N to disable this feature
+
 source "fs/fscache/Kconfig"
 source "fs/cachefiles/Kconfig"
 
