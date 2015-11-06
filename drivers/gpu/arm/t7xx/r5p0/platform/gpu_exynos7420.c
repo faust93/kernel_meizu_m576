@@ -52,13 +52,16 @@ void __iomem *g3d1_outstanding_regs;
 
 /*  clk,vol,abb,min,max,down stay, pm_qos mem, pm_qos int, pm_qos cpu_kfc_min, pm_qos cpu_egl_max */
 static gpu_dvfs_info gpu_dvfs_table_default[] = {
-	{772, 900000, 0, 98, 100, 1, 0, 1552000, 400000, 1500000, 1300000},
-	{700, 900000, 0, 98,  99, 1, 0, 1552000, 400000, 1500000, 1300000},
+	{852, 900000, 0, 97, 100, 1, 0, 1552000, 400000, 1500000, 1300000},
+	{772, 900000, 0, 97,  99, 1, 0, 1552000, 400000, 1500000, 1300000},
+	{700, 900000, 0, 95,  97, 1, 0, 1552000, 400000, 1500000, 1300000},
 	{600, 900000, 0, 78,  85, 1, 0, 1552000, 413000, 1500000, 1300000},
 	{544, 900000, 0, 78,  85, 1, 0, 1026000, 413000, 1500000, 1800000},
 	{420, 900000, 0, 78,  85, 1, 0, 1026000, 267000,  900000, 1800000},
 	{350, 900000, 0, 78,  85, 1, 0,  543000, 200000,       0, CPU_MAX},
 	{266, 900000, 0, 78,  85, 1, 0,  416000, 160000,       0, CPU_MAX},
+	{160, 900000, 0, 78,  85, 1, 0,  167000, 160000,       0, CPU_MAX},
+	{100, 900000, 0, 78,  85, 1, 0,  133000, 160000,       0, CPU_MAX},
 };
 
 static int mif_min_table[] = {
@@ -71,13 +74,13 @@ static int mif_min_table[] = {
 
 static int hpm_freq_table[] = {
 	/* 772, 700, 600, 544, 420, 350, 266 */
-	3, 3, 3, 3, 2, 2, 2,
+	3, 3, 3, 3, 3, 2, 2, 2, 2, 1,
 };
 
 static gpu_attribute gpu_config_attributes[] = {
-	{GPU_MAX_CLOCK, 772},
-	{GPU_MAX_CLOCK_LIMIT, 700},
-	{GPU_MIN_CLOCK, 266},
+	{GPU_MAX_CLOCK, 852},
+	{GPU_MAX_CLOCK_LIMIT, 852},
+	{GPU_MIN_CLOCK, 100},
 	{GPU_DVFS_START_CLOCK, 266},
 	{GPU_DVFS_BL_CONFIG_CLOCK, 266},
 	{GPU_GOVERNOR_TYPE, G3D_DVFS_GOVERNOR_INTERACTIVE},
@@ -100,9 +103,9 @@ static gpu_attribute gpu_config_attributes[] = {
 	{GPU_COLD_MINIMUM_VOL, 0},
 	{GPU_VOLTAGE_OFFSET_MARGIN, 37500},
 	{GPU_TMU_CONTROL, 1},
-	{GPU_TEMP_THROTTLING1, 544},
-	{GPU_TEMP_THROTTLING2, 350},
-	{GPU_TEMP_THROTTLING3, 266},
+	{GPU_TEMP_THROTTLING1, 600},
+	{GPU_TEMP_THROTTLING2, 420},
+	{GPU_TEMP_THROTTLING3, 350},
 	{GPU_TEMP_THROTTLING4, 266},
 	{GPU_TEMP_TRIPPING, 266},
 	{GPU_POWER_COEFF, 443}, /* all core on param */
