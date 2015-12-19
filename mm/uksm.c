@@ -514,7 +514,7 @@ static unsigned int uksm_sleep_jiffies;
 /* Base CPU limit that ratios are scaled against */
 static unsigned int uksm_max_cpu_percentage;
 
-static int uksm_cpu_governor = 1;
+static int uksm_cpu_governor;
 
 static char *uksm_cpu_governor_str[4] = { "full", "medium", "low", "quiet" };
 
