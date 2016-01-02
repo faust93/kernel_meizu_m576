@@ -1356,7 +1356,7 @@ ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags)
 		u64 delta = rq->clock - rq->idle_stamp;
 		u64 max = 2*sysctl_sched_migration_cost;
 
-		update_avg(&rq->avg_idle, delta)
+		update_avg(&rq->avg_idle, delta);
 		
 		if (rq->avg_idle > max)
 			rq->avg_idle = max;
