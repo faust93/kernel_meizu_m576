@@ -101,7 +101,8 @@ mksysmap()
 
 sortextable()
 {
-	${objtree}/scripts/sortextable ${1}
+        echo "Does not work on OSX"
+#	${objtree}/scripts/sortextable ${1}
 }
 
 # Delete output files in case of error
