@@ -4006,8 +4006,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 	 * Card may have been plugged in prior to boot so we
 	 * need to run the detect tasklet
 	 */
-	// skip detect at booting as unstable by CP
-	//queue_delayed_work(host->card_workqueue, &host->card_work, 0);
+	queue_delayed_work(host->card_workqueue, &host->card_work, 0);
 
 	return 0;
 
