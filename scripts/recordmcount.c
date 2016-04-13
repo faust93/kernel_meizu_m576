@@ -40,10 +40,10 @@
 #define R_METAG_NONE                     3
 #endif
 
-#ifndef EM_AARCH64
+//#ifndef EM_AARCH64
 #define EM_AARCH64	183
 #define R_AARCH64_ABS64	257
-#endif
+//#endif
 
 static int fd_map;	/* File descriptor for file being modified. */
 static int mmap_failed; /* Boolean flag. */
