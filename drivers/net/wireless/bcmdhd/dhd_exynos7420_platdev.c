@@ -482,7 +482,7 @@ static int espresso_wifi_get_mac_addr(unsigned char *buf)
 	mm_segment_t oldfs    = {0};
 	char *mac_file       = "/data/calibration/mac_addr";
 	int ret = 0;
-	int no_mac = 0;
+	int no_mac = 1;
 
 	pr_info("%s(), no_mac is %d\n", __func__, no_mac);
 	fp = filp_open(mac_file, O_RDONLY, 0);
