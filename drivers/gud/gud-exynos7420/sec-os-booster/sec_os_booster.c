@@ -34,7 +34,7 @@
 
 #include <mach/secos_booster.h>
 
-#include "platform.h"
+#include "platforms/EXYNOS_7420_STD/platform.h"
 
 #define MID_CPUFREQ	1700000
 
