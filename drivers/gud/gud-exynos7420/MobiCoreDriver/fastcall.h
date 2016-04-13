@@ -15,7 +15,7 @@
 #define _MC_FASTCALL_H_
 
 #include "debug.h"
-#include "platform.h"
+#include "platforms/EXYNOS_7420_STD/platform.h"
 
 /* Use the arch_extension sec pseudo op before switching to secure world */
 #if defined(__GNUC__) && \
