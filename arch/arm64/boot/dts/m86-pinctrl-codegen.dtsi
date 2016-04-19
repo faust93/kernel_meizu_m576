@@ -1172,6 +1172,13 @@
 			samsung,pin-drv = <0>;
 		};
 
+		spi4_cs_func: spi4-cs-func {
+        		samsung,pins = "gpv7-1";
+        		samsung,pin-function = <2>;
+        		samsung,pin-pud = <3>;
+        		samsung,pin-drv = <0>;
+    			};
+    			
 		spi4_cs: spi4-cs {
 			samsung,pins = "gpv7-1";
 			samsung,pin-function = <1>;
