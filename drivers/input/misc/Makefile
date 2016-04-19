@@ -66,5 +66,3 @@ obj-$(CONFIG_INPUT_XEN_KBDDEV_FRONTEND)	+= xen-kbdfront.o
 obj-$(CONFIG_INPUT_YEALINK)		+= yealink.o
 obj-$(CONFIG_JANUARY_BOOSTER)           += janeps_booster.o
 obj-$(CONFIG_STMVL6180)			+= vl6180/
-
-obj-$(CONFIG_INPUT_FPC_FINGERPRINT)	+= fpc-fingerprint/

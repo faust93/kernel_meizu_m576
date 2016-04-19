@@ -684,6 +684,4 @@ config STMVL6180
 	  To compile this driver as a module, choose M here: the
 	  module will be called stmvl6180.
 
-source "drivers/input/misc/fpc-fingerprint/Kconfig"
-
 endif
