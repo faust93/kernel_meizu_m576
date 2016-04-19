@@ -24,6 +24,8 @@ obj-$(CONFIG_INPUT_TABLET)	+= tablet/
 obj-$(CONFIG_INPUT_TOUCHSCREEN)	+= touchscreen/
 obj-$(CONFIG_INPUT_MISC)	+= misc/
 
+obj-$(CONFIG_INPUT_FINGERPRINT) += fingerprint/
+
 obj-$(CONFIG_EXYNOS_TOUCH_DAEMON)	+= exynos_touch_daemon.o
 
 obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o

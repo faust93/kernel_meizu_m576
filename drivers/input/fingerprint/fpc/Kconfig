@@ -1,0 +1,15 @@
+#
+# Goodix GT9xx Touchscreen driver
+#
+
+config FINGERPRINT_FPC_FPC1020_FAMILY
+	tristate "FPC1020 Family fingerprint driver"
+	depends on INPUT_FINGERPRINT_FPC
+	default y
+	help
+	  This is the driver for FPC1020 family fingerprint
+
+	  Say Y here if you have a FPC1020 family fingerprint connected
+	  to your system.
+
+	  If unsure, say N.
