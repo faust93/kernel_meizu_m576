@@ -1850,6 +1850,17 @@ static unsigned char *fts_status_event_handler(
 /* EventId : 0x05 */
 #define fts_motion_pointer_event_handler fts_enter_pointer_event_handler
 
+#if 0
+void fts_input_report_key(struct fts_ts_info *info, int key_code) 
+{
+    mutex_lock(&info->input_report_mutex);
+    input_report_key(info->input_dev, key_code, 1);
+    input_sync(info->input_dev);        /* must be sync,else upmenu maybe popdown  */
+    input_report_key(info->input_dev, key_code, 0);
+    input_sync(info->input_dev);
+    mutex_unlock(&info->input_report_mutex);    
+}
+#endif
 
 /* EventId : 0x20 */
 static unsigned char *fts_gesture_event_handler(
@@ -1858,10 +1869,15 @@ static unsigned char *fts_gesture_event_handler(
 {
 
 	unsigned char touchId;
+        int key_code;
+
 	//static int x_off, y_off;
 
 	//unsigned char gesture_direction;
 	dev_dbg(info->dev, "%s Received event 0x%02x  event[1]  = %d\n", __func__,event[0], event[1] );
+
+        tp_log("FTS fts gesture event data : %02X %02X %02X %02X %02X %02X %02X\n",
+                         event[0], event[1], event[2], event[3], event[4], event[5], event[6]);
 
 	/* always use touchId zero */
 	touchId = 0;
@@ -1871,51 +1887,64 @@ static unsigned char *fts_gesture_event_handler(
 	switch(event[1]){
 	case 0x02:/*add 02-->O*/
 		info->gesture_value = UNICODE_O;
+		key_code = KEY_UNICODE_O;
 		break;
 	case 0x03:/*add 03-->C*/
 		info->gesture_value = UNICODE_C;
+		key_code = KEY_UNICODE_C;
 		break;
 	case 0x04:/*add 04-->M*/
 		info->gesture_value = UNICODE_M;
+		key_code = KEY_UNICODE_M;
 		break;
 	case 0x05:/*add 05-->W*/
 		info->gesture_value = UNICODE_W;
+		key_code = KEY_UNICODE_W;
 		break;
 	case 0x06:/*add 06-->E*/
 		info->gesture_value = UNICODE_E;
+		key_code = KEY_UNICODE_E;
 		break;
 	case 0x0a:/*add 0a-->UP*/
 		info->gesture_value = SWIPE_Y_UP;
+		key_code = KEY_SWIPE_Y_UP;
 		break;
 	case 0x09:/*add 09-->down*/
 		info->gesture_value = SWIPE_Y_DOWN;
+		key_code = KEY_SWIPE_Y_DOWN;
 		break;
 	case 0x07:/*add 07-->left*/
 		info->gesture_value = SWIPE_X_RIGHT;
+		key_code = KEY_SWIPE_X_RIGHT;
 		break;
 	case 0x08:/*add 08-->right*/
 		info->gesture_value = SWIPE_X_LEFT;
+		key_code = KEY_SWIPE_X_LEFT;
 		break;
 	case 0x01:/*add 01-->double click*/
 		tp_log("%s: case 0x01--> double click\n", __func__);
 		info->gesture_value = DOUBLE_TAP;
+		key_code = KEY_DOUBLE_TAP;
 		break;
 	case 0x0D:/*add 06-->V*/
 		info->gesture_value = UNICODE_V_DOWN;
-		break;
+		key_code = KEY_UNICODE_V_DOWN;
+                break;
 	case 0x0F:/*add 06-->S*/
 		info->gesture_value = UNICODE_S;
+		key_code = KEY_UNICODE_S;
 		break;
 	case 0x10:/*add 06-->Z*/
 		info->gesture_value = UNICODE_Z;
+		key_code = KEY_UNICODE_Z;
 		break;
 
 	default:
 		//info->gesture_value = GESTURE_ERROR;
 		return 0;
 	}
-	input_report_key(info->input_dev, KEY_GESTURE, 1);
-	input_report_key(info->input_dev, KEY_GESTURE, 0);
+	input_report_key(info->input_dev, key_code, 1);
+	input_report_key(info->input_dev, key_code, 0);
 	//input_sync(info->input_dev);
 
 	/*
@@ -3102,7 +3131,18 @@ static int fts_probe(struct i2c_client *client,
 	//input_set_abs_params(info->input_dev, ABS_MT_PRESSURE,
 					// PRESSURE_MIN, PRESSURE_MAX, 0, 0);
 
-	input_set_capability(info->input_dev, EV_KEY, KEY_GESTURE);
+        input_set_capability(info->input_dev, EV_KEY, KEY_DOUBLE_TAP);
+        input_set_capability(info->input_dev, EV_KEY, KEY_UNICODE_M);
+        input_set_capability(info->input_dev, EV_KEY, KEY_UNICODE_O);
+        input_set_capability(info->input_dev, EV_KEY, KEY_UNICODE_E);
+        input_set_capability(info->input_dev, EV_KEY, KEY_UNICODE_W);
+        input_set_capability(info->input_dev, EV_KEY, KEY_UNICODE_C);
+        input_set_capability(info->input_dev, EV_KEY, KEY_UNICODE_S);
+        input_set_capability(info->input_dev, EV_KEY, KEY_UNICODE_Z);
+        input_set_capability(info->input_dev, EV_KEY, KEY_SWIPE_X_LEFT);
+        input_set_capability(info->input_dev, EV_KEY, KEY_SWIPE_X_RIGHT);
+        input_set_capability(info->input_dev, EV_KEY, KEY_SWIPE_Y_UP);
+        input_set_capability(info->input_dev, EV_KEY, KEY_SWIPE_Y_DOWN);
 
 	/* register the multi-touch input device */
 	error = input_register_device(info->input_dev);
