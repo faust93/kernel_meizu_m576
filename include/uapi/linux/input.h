@@ -749,6 +749,24 @@ struct input_keymap_entry {
 #define KEY_BRIGHTNESS_MIN		0x250	/* Set Brightness to Minimum */
 #define KEY_BRIGHTNESS_MAX		0x251	/* Set Brightness to Maximum */
 
+/* fts swipe gestures */
+#define KEY_SWIPE_X_LEFT        0x260
+#define KEY_SWIPE_X_RIGHT       0x261
+#define KEY_SWIPE_Y_DOWN        0x262
+#define KEY_SWIPE_Y_UP          0x263
+#define KEY_UNICODE_C           0x264
+#define KEY_UNICODE_E           0x265
+#define KEY_UNICODE_M           0x266
+#define KEY_UNICODE_O           0x267
+#define KEY_UNICODE_S           0x268
+#define KEY_UNICODE_V_DOWN      0x269
+#define KEY_UNICODE_V_L         0x26a
+#define KEY_UNICODE_V_R         0x26b
+#define KEY_UNICODE_V_UP        0x26c
+#define KEY_UNICODE_W           0x26d
+#define KEY_UNICODE_Z           0x26e
+#define KEY_DOUBLE_TAP          0x26f
+
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
 #define BTN_TRIGGER_HAPPY2		0x2c1
