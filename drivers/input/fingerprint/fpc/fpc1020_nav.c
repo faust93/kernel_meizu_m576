@@ -163,8 +163,8 @@ void init_enhanced_navi_setting(fpc1020_data_t *fpc1020)
 			fpc1020->nav.threshold_ptr_start = 5;
 			fpc1020->nav.duration_ptr_clear = 100;
 			fpc1020->nav.nav_finger_up_threshold = 3;
-			fpc1020->nav.move_time_threshold = 200;
-			fpc1020->nav.move_distance_threshold = 50;
+			fpc1020->nav.move_time_threshold = 400;
+			fpc1020->nav.move_distance_threshold = 350;
 			break;
 #endif /* VENDOR_EDIT */
 		default:
