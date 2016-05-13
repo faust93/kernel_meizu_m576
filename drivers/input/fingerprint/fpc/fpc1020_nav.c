@@ -7,7 +7,7 @@
  * as published by the Free Software Foundation.
  */
 
-#define DEBUG
+//#define DEBUG
 
 #include <linux/input.h>
 #include <linux/delay.h>
@@ -49,21 +49,22 @@ static int capture_nav_image(fpc1020_data_t *fpc1020);
 
 #ifdef VENDOR_EDIT
 //Lycan.Wang@Prd.BasicDrv, 2014-09-12 Add for report touch down or up
-#define FPC1020_KEY_FINGER_TOUCH			KEY_F19	/* 189*/
-#define FPC1020_KEY_MOVE_FORWARD   			KEY_F20	/* 190*/
-#define FPC1020_KEY_MOVE_BACKWARD  			KEY_F21	/* 191*/
-#define FPC1020_KEY_ROTATE_FORWARD			KEY_F22	/* 192*/
-#define FPC1020_KEY_ROTATE_BACKWARD			KEY_F23	/* 192*/
+#define FPC1020_KEY_FINGER_TOUCH			KEY_BACK
+#define FPC1020_KEY_FINGER_DTP			        KEY_MENU
+#define FPC1020_KEY_MOVE_FORWARD   			KEY_F20
+#define FPC1020_KEY_MOVE_BACKWARD  			KEY_F21
+#define FPC1020_KEY_ROTATE_FORWARD			KEY_F22
+#define FPC1020_KEY_ROTATE_BACKWARD			KEY_F23
+#define DTP_INTERVAL_IN_MS 18
+
+#include <linux/timer.h>
+
+struct timer_list s_timer;
 
 #ifdef AS_HOME_KEY
 #define FPC1020_KEY_FINGER_PRESS	KEY_HOME	/* 102*/
 #define FPC1020_KEY_FINGER_DOUBLE_TAB	KEY_F18	/* 188*/
 #define FPC1020_KEY_FINGER_LONG_PRESS	KEY_F19	/* 189*/
-#define LONG_PRESS_TIME_IN_SEC 2 //not use ,only report down&up,long press by phonewindowmanager.java like other key
-#define DOUBLE_TAB_INTERVAL_IN_MS 100
-
-#include <linux/timer.h>
-
 #endif
 
 #endif /* VENDOR_EDIT */
@@ -163,8 +164,8 @@ void init_enhanced_navi_setting(fpc1020_data_t *fpc1020)
 			fpc1020->nav.threshold_ptr_start = 5;
 			fpc1020->nav.duration_ptr_clear = 100;
 			fpc1020->nav.nav_finger_up_threshold = 3;
-			fpc1020->nav.move_time_threshold = 400;
-			fpc1020->nav.move_distance_threshold = 350;
+			fpc1020->nav.move_time_threshold = 350;
+			fpc1020->nav.move_distance_threshold = 450;
 			break;
 #endif /* VENDOR_EDIT */
 		default:
@@ -304,6 +305,25 @@ static void dispatch_touch_event(fpc1020_data_t *fpc1020, int x, int y, int fing
 }
 
 #ifdef VENDOR_EDIT
+
+static void fpc1020_timer_handle(unsigned long arg)
+{
+        fpc1020_data_t *fpc1020 = (fpc1020_data_t *)arg;
+
+        del_timer(&s_timer);
+
+        if(fpc1020->nav.tap_status == FNGR_ST_TAP){
+	    input_report_key(fpc1020->input_dev,
+	    		FPC1020_KEY_FINGER_TOUCH, 1);
+            input_report_key(fpc1020->input_dev,
+			FPC1020_KEY_FINGER_TOUCH, 0);
+	    input_sync(fpc1020->input_dev);
+	    fpc1020->nav.tap_status = FNGR_ST_LOST;
+            pr_info("finger timer single click\n");
+        }
+
+}
+
 //Lycan.Wang@Prd.BasicDrv, 2014-09-29 Add for navigation move event
 /* -------------------------------------------------------------------- */
 static void dispatch_move_event(fpc1020_data_t *fpc1020, int x, int y, int finger_status)
@@ -337,13 +357,8 @@ static void dispatch_move_event(fpc1020_data_t *fpc1020, int x, int y, int finge
 					input_sync(fpc1020->input_dev);
 					input_report_key(fpc1020->input_dev, FPC1020_KEY_ROTATE_BACKWARD, 0);
 					input_sync(fpc1020->input_dev);
-				} 
-			} else if (abs(fpc1020->move_distance) < fpc1020->nav.move_distance_threshold) {
-				input_report_key(fpc1020->input_dev, FPC1020_KEY_FINGER_TOUCH, 1);
-				input_sync(fpc1020->input_dev);
-				input_report_key(fpc1020->input_dev, FPC1020_KEY_FINGER_TOUCH, 0);
-				input_sync(fpc1020->input_dev);
-			}
+				}
+			} 
 			break;
 
 		case FNGR_ST_MOVING:
@@ -383,6 +398,19 @@ static void dispatch_move_event(fpc1020_data_t *fpc1020, int x, int y, int finge
 			}
 			break;
 
+                case FNGR_ST_DOUBLE_TAP:
+			input_report_key(fpc1020->input_dev, FPC1020_KEY_FINGER_DTP, 1);
+			input_sync(fpc1020->input_dev);
+			input_report_key(fpc1020->input_dev, FPC1020_KEY_FINGER_DTP, 0);
+			input_sync(fpc1020->input_dev);
+                        break;
+
+                case FNGR_ST_HOLD:
+			input_report_key(fpc1020->input_dev, FPC1020_KEY_FINGER_TOUCH, 1);
+			input_sync(fpc1020->input_dev);
+                        pr_info("[FPC/DPAD] report long press\n");
+                        break;
+
 		default:
 			break;
 	}
@@ -392,8 +420,11 @@ static void dispatch_move_event(fpc1020_data_t *fpc1020, int x, int y, int finge
 /* -------------------------------------------------------------------- */
 static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int finger_status)
 {
-	const int THRESHOLD_RANGE_TAP = 100;
+	const int THRESHOLD_RANGE_TAP = 500000;
+        const int THRESHOLD_RANGE_MIN_TAP = 60000;
 	//const unsigned long THRESHOLD_DURATION_TAP = 3000;//350;
+	const unsigned long THRESHOLD_DURATION_TAP = 1000;/*long press threshold*/
+	const unsigned long THRESHOLD_DURATION_DTAP = 850;
 	int filtered_finger_status = finger_status;
 	static int deviation_x = 0;
 	static int deviation_y = 0;
@@ -401,7 +432,6 @@ static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int fing
 	static unsigned long tick_down = 0;
 	unsigned long tick_curr = jiffies * 1000 / HZ;
 	unsigned long duration = 0;
-	const unsigned long THRESHOLD_DURATION_HOLD = 900;
 
 	if ( finger_status == FNGR_ST_DETECTED ) {
 		tick_down = tick_curr;
@@ -418,15 +448,67 @@ static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int fing
 			deviation_y = 0;
 			tick_down = 0;
 			fpc1020->nav.tap_status = -1;
-		} else if ( duration > THRESHOLD_DURATION_HOLD ) {
-			filtered_finger_status = FNGR_ST_HOLD;
-			tick_down = 0;
-			deviation_x = 0;
-			deviation_y = 0;
+			printk("[FPC] %s:throw the events\n", __func__);
+			if (duration > THRESHOLD_DURATION_TAP)
+                        {
+                            printk("[FPC] %s: prepare long press because of outside\n", __func__);
+                            filtered_finger_status = FNGR_ST_HOLD;// FNGR_ST_L_HOLD;
+                        }
 		}
-	}
+		else 
+                {
+	            if (duration < THRESHOLD_DURATION_TAP) {
+                        if (finger_status == FNGR_ST_LOST && fpc1020->nav.detect_zones != 0) 
+                        {
+                            if (fpc1020->nav.tap_status == FNGR_ST_TAP && tick_curr - fpc1020->nav.tap_start < THRESHOLD_DURATION_DTAP) //&& deviation == 0)
+                            {
+                                fpc1020->nav.tap_status = FNGR_ST_DOUBLE_TAP;
+                                filtered_finger_status = FNGR_ST_DOUBLE_TAP;
+                                fpc1020->nav.detect_zones = 0;
 
-//	dev_info(&fpc1020->spi->dev, "[INFO] mode[%d] dx : %d / dy : %d\n", fpc1020->nav_settings.btp_input_mode, dx, dy);
+                                if(timer_pending(&s_timer))
+                                    del_timer(&s_timer);
+
+                                pr_info("[FPC] %s:prepare report double click\n", __func__);
+                            }
+                            else if (deviation <= THRESHOLD_RANGE_MIN_TAP)
+                            {
+                                filtered_finger_status = FNGR_ST_TAP;
+                                fpc1020->nav.tap_status = FNGR_ST_TAP;
+                                fpc1020->nav.tap_start = tick_curr;
+
+                                if(!timer_pending(&s_timer)){
+                                    init_timer(&s_timer);
+                                    setup_timer(&s_timer, &fpc1020_timer_handle,(unsigned long)fpc1020);
+                                    mod_timer(&s_timer, jiffies + DTP_INTERVAL_IN_MS);
+                                }
+                                pr_info("[FPC] %s:prepare report single click\n", __func__);
+                            }
+                            else
+                            {
+                                pr_info("[FPC] %s: still finger lost. deviation: %d\n", __func__, deviation);
+                                filtered_finger_status = FNGR_ST_LOST;
+                                fpc1020->nav.filter_long = 0;
+                            }
+
+                            tick_down = 0;
+                            deviation_x = 0;
+                            deviation_y = 0;
+                        }
+                    }
+                    else
+                    {
+                        printk("[FPC] %s: prepare long press\n", __func__);
+                        //if (deviation < THRESHOLD_RANGE_MIN_TAP)
+                        filtered_finger_status = FNGR_ST_HOLD;// FNGR_ST_L_HOLD;
+                        fpc1020->nav.tap_status = -1;
+                        tick_down = 0;
+                        deviation_x = 0;
+                        deviation_y = 0;
+                    }
+	        }
+
+       }
 	dev_info(&fpc1020->spi->dev, "[INFO] mode[%d] dx : %d / dy : %d\n", 1, dx, dy);
 
 	switch(fpc1020->nav.input_mode) {
@@ -491,10 +573,13 @@ int fpc1020_input_init(fpc1020_data_t *fpc1020)
 #ifdef VENDOR_EDIT
         //Lycan.Wang@Prd.BasicDrv, 2014-09-12 Add for report touch down or up
         set_bit(FPC1020_KEY_FINGER_TOUCH, fpc1020->input_dev->keybit);
+        set_bit(FPC1020_KEY_FINGER_DTP, fpc1020->input_dev->keybit);
         set_bit(FPC1020_KEY_MOVE_FORWARD, fpc1020->input_dev->keybit);
         set_bit(FPC1020_KEY_MOVE_BACKWARD, fpc1020->input_dev->keybit);
         set_bit(FPC1020_KEY_ROTATE_FORWARD, fpc1020->input_dev->keybit);
         set_bit(FPC1020_KEY_ROTATE_BACKWARD, fpc1020->input_dev->keybit);
+
+
 #ifdef AS_HOME_KEY
         set_bit(FPC1020_KEY_FINGER_PRESS, fpc1020->input_dev->keybit);
         //set_bit(FPC1020_KEY_FINGER_LONG_PRESS, fpc1020->input_dev->keybit);
@@ -502,11 +587,6 @@ int fpc1020_input_init(fpc1020_data_t *fpc1020)
         set_bit(KEY_POWER, fpc1020->input_dev->keybit);
         set_bit(KEY_F2, fpc1020->input_dev->keybit);
         fpc1020->to_power = false;
-        /*
-        init_timer(&s_timer);
-        s_timer.function = &fpc1020_timer_handle;
-        s_timer.expires = jiffies + LONG_PRESS_TIME_IN_SEC*HZ;//changhua.li check finger present after 100ms
-        */
 #endif
 
 #endif /* VENDOR_EDIT */
@@ -624,30 +704,11 @@ void fpc1020_report_finger_up(fpc1020_data_t *fpc1020)
 
     input_sync(fpc1020->input_dev);
 }
+
+
 #endif /* VENDOR_EDIT */
 
 #ifdef AS_HOME_KEY
-/*
-struct timer_list s_timer;
-static void fpc1020_timer_handle(unsigned long arg)
-{
-    int error = 0;
-    //mod_timer(&s_timer, jiffies + HZ);
-    error = fpc1020_wait_finger_present_lpm(fpc1020);
-		
-		if (error == 0) {
-			input_report_key(fpc1020->input_dev,
-						FPC1020_KEY_FINGER_PRESS, 1);
-			input_report_key(fpc1020->input_dev,
-						FPC1020_KEY_FINGER_PRESS, 0);
-
-			input_sync(fpc1020->input_dev);
-		}
-    //del_timer(&switch_data->s_timer);
-    
-    printk(KERN_ERR "finger timer to check finger present after 2s. \n");
-}
-*/
 
 /* -------------------------------------------------------------------- */
 static int fpc1020_write_lpm_setup(fpc1020_data_t *fpc1020)
@@ -957,6 +1018,7 @@ int fpc1020_input_task(fpc1020_data_t *fpc1020)
 //
 		process_navi_event(fpc1020, 0, 0, FNGR_ST_DETECTED);
 //
+                fpc1020->nav.detect_zones = error & 0xFFF;
 		error = capture_nav_image(fpc1020);
 		if(error < 0)
 			break;
@@ -1020,7 +1082,7 @@ int fpc1020_input_task(fpc1020_data_t *fpc1020)
 
 #ifndef VENDOR_EDIT
 	//Lycan.Wang@Prd.BasicDrv, 2014-09-28 Remove for nav disabled when out of suspend
-    atomic_set(&fpc1020->taskstate, fp_UNINIT);
+        atomic_set(&fpc1020->taskstate, fp_UNINIT);
 
 	fpc1020->nav.enabled = false;
 #endif /* VENDOR_EDIT */

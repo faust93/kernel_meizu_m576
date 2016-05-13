@@ -189,10 +189,14 @@ typedef struct fpc1020_nav_struct {
 	u8 image_nav_col_groups;
 
 	unsigned long time;
+        unsigned long tap_start;
 	int tap_status;
 	u8 input_mode;
+	u8 detect_zones;
 	int nav_sum_x;
 	int nav_sum_y;
+	
+	int filter_long;
 	
 	u8 p_multiplier_x;
 	u8 p_multiplier_y;
