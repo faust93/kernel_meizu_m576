@@ -57,7 +57,7 @@ static bool thread_start = false;
 static unsigned int low_stay_threshold = DEFAULT_LOW_STAY_THRSHD;
 static int cpu_util[NR_CPUS];
 static unsigned int cur_load_freq = 0;
-static bool lcd_is_on = true;
+bool lcd_is_on = true;
 static bool forced_hotplug = false;
 static bool in_low_power_mode = false;
 static bool in_suspend_prepared = false;

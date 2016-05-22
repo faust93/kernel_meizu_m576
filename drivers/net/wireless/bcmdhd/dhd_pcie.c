@@ -991,10 +991,10 @@ bool dhd_bus_watchdog(dhd_pub_t *dhd)
         }
 
 	if(current_level < 3 && false == status_bl1 && false == lcd_is_on){
-		wifi_cl1_get();
+//		wifi_cl1_get();
 		status_bl1 = true;
 	}else if(current_level >= 3 && true == status_bl1){
-		wifi_cl1_release();
+//		wifi_cl1_release();
 		status_bl1 = false;
 	}
 
