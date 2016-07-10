@@ -9,6 +9,13 @@
 #
 # Normal rules
 #
+build.sh
+output
+*.bak
+1.sh
+*.*_
+*.*__
+*.rej
 .*
 *.o
 *.o.*
