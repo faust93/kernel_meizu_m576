@@ -11,6 +11,7 @@
 
 /dts-v1/;
 #include "exynos7420-codegen.dtsi"
+#include <generated/autoconf.h>
 #include "m86-powersupply-codegen.h"
 #include "m86-i2c-codegen.dtsi"
 #include "m86-powersupply-codegen.dtsi"
@@ -109,7 +110,7 @@
 	};
 
 	chosen {
-		bootargs = "console=ttyFIQ2,115200n8 no_console_suspend";
+		bootargs = "console=ttyFIQ2,115200n8 no_console_suspend ro.hardware=m86";
 	};
 
 	ramoops {
@@ -802,16 +803,6 @@
 		status = "okay";
 	};
 
-	fpc_interrupt {
-		status        = "ok";
-		compatible    = "fpc,fpc_irq";
-		reg = <0x14d70000 0x20000>;
-
-		fpc,gpio_irq = <&gpa2 2 0xf>;
-		fpc,gpio_rst = <&gpv7 4 0x1>;
-	};
-
-
 	audio_codec_dummy: dummy-codec {
 		compatible = "samsung,dummy-codec";
 		status = "okay";
@@ -851,5 +842,13 @@
 			&gpa0 7 1 /* volup */
 			&gpa1 2 1 /* voldown */
 			>;
+	};
+
+	pmu {
+		compatible = "arm,armv8-pmuv3";
+		interrupts = <0 60 4>,
+			     <0 61 4>,
+			     <0 62 4>,
+			     <0 63 4>;
 	};
 };

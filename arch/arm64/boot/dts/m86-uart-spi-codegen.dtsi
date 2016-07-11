@@ -107,25 +107,20 @@
 	};
 };
 
- &spi4_cs_func_pinctrl {
-      spi4_cs_func: spi4-cs-func {
-          samsung,pins = "gpv7-1";
-          samsung,pin-function = <2>;
-          samsung,pin-pud = <3>;
-          samsung,pin-drv = <0>;
-      };
-  };
-
-&securefpc_spi {
-	secure-mode;
-	pinctrl-0 = <&securefpc_spi_bus	&securefpc_spi_cs_func>;
+&fingerprint_spi {
 	status = "ok";
 
-	securefpc_spidev@0{
-		compatible = "spi-fpc-dummy";
-		reg = <0>;
-		spi-max-frequency = <16000000>;
-		//fpc,gpio_reset    = <&gpv7 4 0x1>;
+	fingerprint_spi@0 {
+		compatible = "fpc,fpc1020";
+		reg = <0x0>;
+		spi-max-frequency = <4800000>;
+		fpc,gpio_irq = <&gpa2 2 0xf>;
+		fpc,gpio_reset = <&gpv7 4 0x1>;
+		#fpc,use_fpc2050 = <1>;
+		fpc,txout_boost_enable = <1>;
+		
+		pinctrl-names ="default";
+		pinctrl-0 = <&spi4_cs_func>;
 
 		controller-data {
 			samsung,spi-feedback-delay = <0>;
