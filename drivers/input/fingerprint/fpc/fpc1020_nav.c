@@ -55,7 +55,6 @@ static int capture_nav_image(fpc1020_data_t *fpc1020);
 #define FPC1020_KEY_MOVE_BACKWARD  			KEY_F21
 #define FPC1020_KEY_ROTATE_FORWARD			KEY_F22
 #define FPC1020_KEY_ROTATE_BACKWARD			KEY_F23
-#define DTP_INTERVAL_IN_MS 18
 
 #include <linux/timer.h>
 
@@ -480,7 +479,7 @@ static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int fing
                                 if(!timer_pending(&s_timer)){
                                     init_timer(&s_timer);
                                     setup_timer(&s_timer, &fpc1020_timer_handle,(unsigned long)fpc1020);
-                                    mod_timer(&s_timer, jiffies + DTP_INTERVAL_IN_MS);
+                                    mod_timer(&s_timer, jiffies + fpc1020->setup.dtp_interval);
                                 }
                                 pr_info("[FPC] %s:prepare report single click\n", __func__);
                             }

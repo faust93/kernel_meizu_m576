@@ -281,6 +281,7 @@ static FPC1020_DEV_ATTR(setup, capture_row_start,	DEVFS_SETUP_MODE);
 static FPC1020_DEV_ATTR(setup, capture_row_count,	DEVFS_SETUP_MODE);
 static FPC1020_DEV_ATTR(setup, capture_col_start,	DEVFS_SETUP_MODE);
 static FPC1020_DEV_ATTR(setup, capture_col_groups,	DEVFS_SETUP_MODE);
+static FPC1020_DEV_ATTR(setup, dtp_interval,		DEVFS_SETUP_MODE);
 
 static struct attribute *fpc1020_setup_attrs[] = {
 	&fpc1020_attr_adc_gain.attr.attr,
@@ -293,6 +294,7 @@ static struct attribute *fpc1020_setup_attrs[] = {
 	&fpc1020_attr_capture_row_count.attr.attr,
 	&fpc1020_attr_capture_col_start.attr.attr,
 	&fpc1020_attr_capture_col_groups.attr.attr,
+	&fpc1020_attr_dtp_interval.attr.attr,
 	NULL
 };
 
@@ -1877,6 +1879,9 @@ static ssize_t fpc1020_show_attr_setup(struct device *dev,
 	else if (fpc_attr->offset == offsetof(fpc1020_setup_t, capture_col_groups))
 		val = fpc1020->setup.capture_col_groups;
 
+	else if (fpc_attr->offset == offsetof(fpc1020_setup_t, dtp_interval))
+		val = fpc1020->setup.dtp_interval;
+
 	if (val >= 0)
 		return scnprintf(buf, PAGE_SIZE, "%i\n", val);
 
@@ -1983,6 +1988,12 @@ static ssize_t fpc1020_store_attr_setup(struct device *dev,
 				fpc1020->setup.capture_col_groups = (u8)val;
 			} else
 				return -EINVAL;
+
+		} else if (fpc_attr->offset ==
+			offsetof(fpc1020_setup_t, dtp_interval)) {
+
+			fpc1020->setup.dtp_interval =
+					(u8)val;
 
 		} else
 			return -ENOENT;

@@ -231,6 +231,7 @@ typedef struct fpc1020_setup {
 	u8 capture_finger_up_threshold;
 	u8 capture_finger_down_threshold;
 	u8 finger_detect_threshold;
+	u8 dtp_interval;
 	u8 wakeup_detect_rows[FPC1020_WAKEUP_DETECT_ZONE_COUNT];
 	u8 wakeup_detect_cols[FPC1020_WAKEUP_DETECT_ZONE_COUNT];
 } fpc1020_setup_t;

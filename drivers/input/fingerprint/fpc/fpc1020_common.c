@@ -332,6 +332,7 @@ int fpc1020_setup_defaults(fpc1020_data_t *fpc1020)
 		goto out_err;
 
 	memcpy((void *)&fpc1020->setup,	ptr, sizeof(fpc1020_setup_t));
+	fpc1020->setup.dtp_interval = 18;
 
 	dev_dbg(&fpc1020->spi->dev, "%s OK\n", __func__);
 
