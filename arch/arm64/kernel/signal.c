@@ -194,7 +194,7 @@ static int setup_sigframe(struct rt_sigframe __user *sf,
 		aux += sizeof(*fpsimd_ctx);
 	}
 
-	/* fault information, if valid */
+	/* fault information, if valid 
 	if (current->thread.fault_code) {
 		struct esr_context *esr_ctx =
 			container_of(aux, struct esr_context, head);
@@ -203,7 +203,7 @@ static int setup_sigframe(struct rt_sigframe __user *sf,
 		__put_user_error(current->thread.fault_code, &esr_ctx->esr, err);
 		aux += sizeof(*esr_ctx);
 	}
-
+        */
 	/* set the "end" magic */
 	end = aux;
 	__put_user_error(0, &end->magic, err);
