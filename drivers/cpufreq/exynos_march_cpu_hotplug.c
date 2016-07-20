@@ -2,6 +2,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
+#include <linux/cpufreq_kt.h>
 #include <linux/cpu.h>
 #include <linux/jiffies.h>
 #include <linux/kernel_stat.h>
@@ -350,6 +351,7 @@ static int fb_state_change(struct notifier_block *nb,
 	switch (blank) {
 	case FB_BLANK_POWERDOWN:
 		lcd_is_on = false;
+                screen_is_on = false;
 #ifdef CONFIG_BCMDHD_PCIE
 		if(current_level >= 3){
 #endif
@@ -364,6 +366,7 @@ static int fb_state_change(struct notifier_block *nb,
 
 	case FB_BLANK_UNBLANK:
 		lcd_is_on = true;
+                screen_is_on = true;
 		if (pm_qos_request_active(&cluster1_num_max_qos))
 			pm_qos_update_request(&cluster1_num_max_qos, NR_CLUST1_CPUS);
 		set_curr_status(CURR_NORMAL);
