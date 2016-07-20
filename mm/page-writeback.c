@@ -37,9 +37,9 @@
 #include <linux/timer.h>
 #include <linux/sched/rt.h>
 #include <trace/events/writeback.h>
-#ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
 #include <linux/powersuspend.h>
-#endif
+
+#define DYNAMIC_PAGE_WRITEBACK 1
 
 /*
  * Sleep at most 200ms at a time in balance_dirty_pages().
@@ -107,7 +107,7 @@ unsigned long vm_dirty_bytes;
 unsigned int dirty_writeback_interval = DEFAULT_DIRTY_WRITEBACK_INTERVAL; /* centiseconds */
 EXPORT_SYMBOL_GPL(dirty_writeback_interval);
 
-#ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
+#ifdef DYNAMIC_PAGE_WRITEBACK
 /*
  * The dynamic writeback activation status
  */
@@ -1581,7 +1581,7 @@ int dirty_writeback_centisecs_handler(ctl_table *table, int write,
 	return 0;
 }
 
-#ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
+#ifdef DYNAMIC_PAGE_WRITEBACK
 /*
  * Manages the dirty page writebacks activation status
  */
@@ -1726,7 +1726,7 @@ static struct notifier_block __cpuinitdata ratelimit_nb = {
 	.next		= NULL,
 };
 
-#ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
+#ifdef DYNAMIC_PAGE_WRITEBACK
 /*
  * Sets the dirty page writebacks interval for suspended system
  */
@@ -1803,7 +1803,7 @@ void __init page_writeback_init(void)
 
 	register_power_suspend(&dirty_suspend);
 
-#ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
+#ifdef DYNAMIC_PAGE_WRITEBACK
 	/* Register the dirty page writeback management during suspend/resume */
 	register_power_suspend(&dirty_writeback_suspend);
 #endif
