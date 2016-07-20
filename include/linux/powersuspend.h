@@ -5,15 +5,6 @@
  *
  * Modified by Jean-Pierre Rasquin <yank555.lu@gmail.com>
  *
- *  v1.1 - make powersuspend not depend on a userspace initiator anymore,
- *         but use a hook in autosleep instead.
- *
- *  v1.2 - make kernel / userspace mode switchable
- *
- *  v1.3 - add a hook in display panel driver as alternative kernel trigger
- *
- *  v1.4 - add a hybrid-kernel mode, accepting both kernel hooks (first wins)
- *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
