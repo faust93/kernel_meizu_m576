@@ -49,6 +49,42 @@
 #include <mach/exynos-pm.h>
 #include "cal_tmu7420.h"
 
+static unsigned int HOT_NORMAL_TEMP = 95;
+static unsigned int HOT_CRITICAL_TEMP = 110;
+
+static unsigned int MIF_TH_TEMP1 = 55;
+static unsigned int MIF_TH_TEMP2 = 95;
+
+static unsigned int GPU_TH_TEMP1 = 90;
+static unsigned int GPU_TH_TEMP2 = 95;
+static unsigned int GPU_TH_TEMP3 = 100;
+static unsigned int GPU_TH_TEMP4 = 105;
+static unsigned int GPU_TH_TEMP5 = 110;
+
+static unsigned int ISP_TH_TEMP1 = 85;
+static unsigned int ISP_TH_TEMP2 = 95;
+static unsigned int ISP_TH_TEMP3 = 100;
+static unsigned int ISP_TH_TEMP4 = 105;
+static unsigned int ISP_TH_TEMP5 = 110;
+
+module_param_named(tmu_cpu_normal, HOT_NORMAL_TEMP, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_cpu_critical, HOT_CRITICAL_TEMP, uint, S_IWUSR | S_IRUGO);
+
+module_param_named(tmu_mif_normal, MIF_TH_TEMP1, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_mif_hot, MIF_TH_TEMP2, uint, S_IWUSR | S_IRUGO);
+
+module_param_named(tmu_gpu_temp1, GPU_TH_TEMP1, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_gpu_temp2, GPU_TH_TEMP2, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_gpu_temp3, GPU_TH_TEMP3, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_gpu_temp4, GPU_TH_TEMP4, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_gpu_temp5, GPU_TH_TEMP5, uint, S_IWUSR | S_IRUGO);
+
+module_param_named(tmu_isp_temp1, ISP_TH_TEMP1, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_isp_temp2, ISP_TH_TEMP2, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_isp_temp3, ISP_TH_TEMP3, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_isp_temp4, ISP_TH_TEMP4, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_isp_temp5, ISP_TH_TEMP5, uint, S_IWUSR | S_IRUGO);
+
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 static struct cpumask mp_cluster_cpus[CL_END];
 #endif

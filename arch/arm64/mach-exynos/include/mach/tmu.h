@@ -21,10 +21,15 @@
 
 #define COLD_TEMP		19
 #define COLD_TEMP_LOW_POWER_THRESHOLD	28
+#if defined(CONFIG_SOC_EXYNOS7420)
+//
+#else
+#define COLD_TEMP_LOW_POWER_THRESHOLD	28
 #define HOT_NORMAL_TEMP		95
 #define HOT_CRITICAL_TEMP	110
 #define MIF_TH_TEMP1		65
 #define MIF_TH_TEMP2		95
+#endif
 
 #if defined(CONFIG_SOC_EXYNOS5433)
 #define GPU_TH_TEMP1		95
@@ -33,11 +38,7 @@
 #define GPU_TH_TEMP4		110
 #define GPU_TH_TEMP5		115
 #elif defined(CONFIG_SOC_EXYNOS7420)
-#define GPU_TH_TEMP1		90
-#define GPU_TH_TEMP2		95
-#define GPU_TH_TEMP3		100
-#define GPU_TH_TEMP4		105
-#define GPU_TH_TEMP5		110
+//
 #else
 #define GPU_TH_TEMP1		85
 #define GPU_TH_TEMP2		90
@@ -47,11 +48,6 @@
 #endif
 
 #if defined(CONFIG_SOC_EXYNOS7420)
-#define ISP_TH_TEMP1		85
-#define ISP_TH_TEMP2		95
-#define ISP_TH_TEMP3		100
-#define ISP_TH_TEMP4		105
-#define ISP_TH_TEMP5		110
 
 enum isp_noti_state_t {
 	ISP_NORMAL = 0,
