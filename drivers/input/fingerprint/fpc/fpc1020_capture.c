@@ -271,8 +271,8 @@ int fpc1020_capture_task(fpc1020_data_t *fpc1020)
 		break;
 
 	case FPC1020_MODE_WAIT_AND_CAPTURE:
-		wait_finger_down =
-		wait_finger_up   = true;
+		wait_finger_down = true;
+//		wait_finger_up   = true;
 
 	case FPC1020_MODE_SINGLE_CAPTURE:
 	case FPC1020_MODE_SINGLE_CAPTURE_CAL:
@@ -384,7 +384,7 @@ int fpc1020_capture_task(fpc1020_data_t *fpc1020)
 
 		dev_dbg(&fpc1020->spi->dev, "Finger down\n");
 
-#ifdef VENDOR_EDIT
+#if 0 // VENDOR_EDIT
 		//Lycan.Wang@Prd.BasicDrv, 2014-09-12 Add for fingerprint animation
 		if (mode == FPC1020_MODE_WAIT_AND_CAPTURE) {
 			fpc1020_report_finger_down(fpc1020);
@@ -509,7 +509,7 @@ int fpc1020_capture_task(fpc1020_data_t *fpc1020)
 		}
 
 		dev_dbg(&fpc1020->spi->dev, "Finger up\n");
-#ifdef VENDOR_EDIT
+#if 0 //VENDOR_EDIT
 		//Lycan.Wang@Prd.BasicDrv, 2014-09-12 Add for fingerprint animation
 		if (mode == FPC1020_MODE_WAIT_AND_CAPTURE) {
 			fpc1020_report_finger_up(fpc1020);
@@ -551,7 +551,7 @@ out_error:
 		fpc1020->capture.state = FPC1020_CAPTURE_STATE_FAILED;
 		dev_err(&fpc1020->spi->dev, "%s %s %d\n", __func__,
 			(error == -EINTR) ? "TERMINATED" : "FAILED", error);
-#ifdef VENDOR_EDIT
+#if 0 //VENDOR_EDIT
 		//Lycan.Wang@Prd.BasicDrv, 2014-09-16 Add for report up when capture terminated
 		if (mode == FPC1020_MODE_WAIT_AND_CAPTURE) {
 			fpc1020_report_finger_up(fpc1020);

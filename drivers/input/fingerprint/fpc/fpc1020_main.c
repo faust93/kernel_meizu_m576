@@ -423,7 +423,11 @@ static ssize_t fpc1020_nav_switch_write(struct file *file, const char __user *bu
 #endif
 	dev_err(&fpc1020->spi->dev, "nav_switch change to %d\n", nav_switch);
 
-	write_nav_switch(fpc1020);
+	// prevent setting nav mode while screen is off
+	if(nav_switch == 1 && !enable_keys)
+	    return count;
+	else
+	    write_nav_switch(fpc1020);
 
 	return count;
 }
@@ -845,10 +849,14 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 			dev_err(&fpc1020->spi->dev, "%s change to home key\n", __func__);
 			fpc1020->to_power = false;
 			enable_keys = 1;
+//			nav_switch = 1;
+//			write_nav_switch(fpc1020);
 		} else if( *blank == FB_BLANK_POWERDOWN && (event == FB_EVENT_BLANK )) {
 			dev_err(&fpc1020->spi->dev, "%s change to power key\n", __func__);
 			fpc1020->to_power = true;
 			enable_keys = 0;
+//			nav_switch = 0;
+//			write_nav_switch(fpc1020);
 		}
 	}
 	return 0;

@@ -270,15 +270,14 @@ typedef struct {
 	u32                    vdden_gpio;  //ranfei
 #endif /* VENDOR_EDIT */
 
-	#ifdef VENDOR_EDIT //changhua add for reconize DT CT module
+#ifdef VENDOR_EDIT
 	int vendor_gpio;
 	int fp2050_gpio;
 	bool  to_power;
-	#if defined(CONFIG_FB)
+#if defined(CONFIG_FB)
 	struct notifier_block fb_notif;
-    #endif
-	#endif
-
+#endif
+#endif
 	int                    irq;
 	wait_queue_head_t      wq_irq_return;
 	bool                   interrupt_done;
@@ -309,14 +308,14 @@ typedef struct {
 #ifdef VENDOR_EDIT
 	//Lycan.Wang@Prd.BasicDrv, 2014-09-29 Add for navigation move event
 	unsigned long 		touch_time;
-	int 				move_distance;	
+	int			move_distance;	
 	unsigned int 		moving_key;
 #endif /* VENDOR_EDIT */
 
 #ifdef FPC_TEE_INTERRUPT_ONLY
 	wait_queue_head_t 		g_irq_event;
 	bool                    tee_interrupt_done;
-	bool 					tee_int_enable;
+	bool			tee_int_enable;
 	bool                    wait_abort;
 	bool                    wake_irq_state;
 
