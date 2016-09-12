@@ -17,6 +17,7 @@
 #include <linux/threads.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
+#include <asm/cputime.h>
 #include <linux/completion.h>
 #include <linux/workqueue.h>
 #include <linux/cpumask.h>
@@ -475,6 +476,12 @@ void cpufreq_frequency_table_get_attr(struct cpufreq_frequency_table *table,
 void cpufreq_frequency_table_update_policy_cpu(struct cpufreq_policy *policy);
 
 void cpufreq_frequency_table_put_attr(unsigned int cpu);
+
+/*********************************************************************
+ *                         CPUFREQ STATS                             *
+ *********************************************************************/
+
+void acct_update_power(struct task_struct *p, cputime_t cputime);
 
 #ifdef CONFIG_EXYNOS_MARCH_DYNAMIC_CPU_HOTPLUG
 struct time_in_state_info {
