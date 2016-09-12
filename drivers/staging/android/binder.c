@@ -1905,8 +1905,16 @@ static int binder_thread_write(struct binder_proc *proc,
 				BUG_ON(!buffer->target_node->has_async_transaction);
 				if (list_empty(&buffer->target_node->async_todo))
 					buffer->target_node->has_async_transaction = 0;
-				else
-					list_move_tail(buffer->target_node->async_todo.next, &thread->todo);
+				else {
+					uint32_t next_cmd;
+					if (unlikely(ptr < end && !get_user(next_cmd, (binder_uintptr_t __user *)ptr)
+						     && next_cmd == BC_TRANSACTION)) {
+						list_move_tail(buffer->target_node->async_todo.next, &thread->proc->todo);
+						wake_up_interruptible(&thread->proc->wait);
+					} else
+						list_move_tail(buffer->target_node->async_todo.next, &thread->todo);
+				}
+
 			}
 			trace_binder_transaction_buffer_release(buffer);
 			binder_transaction_buffer_release(proc, buffer, NULL);

@@ -941,11 +941,19 @@ static int ion_debug_client_show(struct seq_file *s, void *unused)
 		return -EINVAL;
 	}
 
+#ifdef CONFIG_ION_EXYNOS_STAT_LOG
 	seq_printf(s, "%16.s %16.s %4.s %16.s %4.s %10.s %8.s %9.s\n",
 			"buffer", "task", "pid", "thread", "tid", "size",
 			"# procs", "flag");
 	seq_printf(s, "----------------------------------------------"
 			"--------------------------------------------\n");
+#else
+	seq_printf(s, "%16.s %16.s %4.s %10.s %8.s %9.s\n",
+			"buffer", "task", "pid", "size",
+			"# procs", "flag");
+	seq_printf(s, "----------------------------------------------"
+			"---------------------\n");
+#endif
 
 	mutex_lock(&client->lock);
 	for (n = rb_first(&client->handles); n; n = rb_next(n)) {
@@ -958,10 +966,16 @@ static int ion_debug_client_show(struct seq_file *s, void *unused)
 			names[id] = buffer->heap->name;
 		sizes[id] += buffer->size;
 		sizes_pss[id] += (buffer->size / buffer->handle_count);
+#ifdef CONFIG_ION_EXYNOS_STAT_LOG
 		seq_printf(s, "%16p %16.s %4u %16.s %4u %10zu %8d %9lx\n",
 				buffer, buffer->task_comm, buffer->pid,
 				buffer->thread_comm, buffer->tid, buffer->size,
 				buffer->handle_count, buffer->flags);
+#else
+		seq_printf(s, "%16p %16.s %4u %10zu %8d %9lx\n",
+				buffer, buffer->task_comm, buffer->pid,
+				buffer->size, buffer->handle_count, buffer->flags);
+#endif
 	}
 	mutex_unlock(&client->lock);
 	up_read(&g_idev->lock);
@@ -1493,13 +1507,13 @@ struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 		mutex_unlock(&client->lock);
 		goto end;
 	}
-	mutex_unlock(&client->lock);
 
 	handle = ion_handle_create(client, buffer);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		mutex_unlock(&client->lock);
 		goto end;
+	}
 
-	mutex_lock(&client->lock);
 	ret = ion_handle_add(client, handle);
 	mutex_unlock(&client->lock);
 	if (ret) {
@@ -1555,6 +1569,74 @@ static int ion_sync_for_device(struct ion_client *client, int fd)
 				buffer->vaddr, 0, false);
 
 	dma_buf_put(dmabuf);
+	return 0;
+}
+
+static int ion_sync_partial_for_device(struct ion_client *client, int fd,
+					off_t offset, size_t len)
+{
+	struct dma_buf *dmabuf;
+	struct ion_buffer *buffer;
+	struct scatterlist *sg, *sgl;
+	size_t remained = len;
+	int nelems;
+	int i;
+
+	dmabuf = dma_buf_get(fd);
+	if (IS_ERR(dmabuf))
+		return PTR_ERR(dmabuf);
+
+	/* if this memory came from ion */
+	if (dmabuf->ops != &dma_buf_ops) {
+		pr_err("%s: can not sync dmabuf from another exporter\n",
+		       __func__);
+		dma_buf_put(dmabuf);
+		return -EINVAL;
+	}
+	buffer = dmabuf->priv;
+
+	if (!ion_buffer_cached(buffer) ||
+			ion_buffer_fault_user_mappings(buffer)) {
+		dma_buf_put(dmabuf);
+		return 0;
+	}
+
+	trace_ion_sync_start(_RET_IP_, buffer->dev->dev.this_device,
+				DMA_BIDIRECTIONAL, buffer->size,
+				buffer->vaddr, 0, false);
+
+	sgl = buffer->sg_table->sgl;
+	nelems = buffer->sg_table->nents;
+
+	for_each_sg(sgl, sg, nelems, i) {
+		size_t len_to_flush;
+		if (offset >= sg->length) {
+			offset -= sg->length;
+			continue;
+		}
+
+		len_to_flush = sg->length - offset;
+		if (remained < len_to_flush) {
+			len_to_flush = remained;
+			remained = 0;
+		} else {
+			remained -= len_to_flush;
+		}
+
+		__dma_map_area(phys_to_virt(sg_phys(sg)) + offset,
+				len_to_flush, DMA_TO_DEVICE);
+
+		if (remained == 0)
+			break;
+		offset = 0;
+	}
+
+	trace_ion_sync_end(_RET_IP_, buffer->dev->dev.this_device,
+				DMA_BIDIRECTIONAL, buffer->size,
+				buffer->vaddr, 0, false);
+
+	dma_buf_put(dmabuf);
+
 	return 0;
 }
 
@@ -1615,6 +1697,7 @@ static unsigned int ion_ioctl_dir(unsigned int cmd)
 {
 	switch (cmd) {
 	case ION_IOC_SYNC:
+	case ION_IOC_SYNC_PARTIAL:
 	case ION_IOC_FREE:
 	case ION_IOC_CUSTOM:
 		return _IOC_WRITE;
@@ -1633,6 +1716,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	union {
 		struct ion_fd_data fd;
+		struct ion_fd_partial_data fd_partial;
 		struct ion_allocation_data allocation;
 		struct ion_handle_data handle;
 		struct ion_custom_data custom;
@@ -1704,6 +1788,12 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case ION_IOC_SYNC:
 	{
 		ret = ion_sync_for_device(client, data.fd.fd);
+		break;
+	}
+	case ION_IOC_SYNC_PARTIAL:
+	{
+		ret = ion_sync_partial_for_device(client, data.fd_partial.fd,
+			data.fd_partial.offset, data.fd_partial.len);
 		break;
 	}
 	case ION_IOC_CUSTOM:
@@ -2225,48 +2315,6 @@ static int ion_debug_buffer_show(struct seq_file *s, void *unused)
 
 	return 0;
 }
-
-void show_ion_buffer_size(void)
-{
-	struct ion_device *dev = g_idev;
-	struct rb_node *n;
-	size_t total_size = 0;
-
-	printk("%20.s %16.s %4.s %16.s %4.s %10.s %4.s %3.s %6.s \n",
-			   "heap", "task", "pid", "thread", "tid",
-			   "size", "kmap", "ref", "handle");
-	printk("------------------------------------------"
-			   "----------------------------------------"
-			   "----------------------------------------"
-			   "--------------------------------------\n");
-
-	mutex_lock(&dev->buffer_lock);
-	for (n = rb_first(&dev->buffers); n; n = rb_next(n)) {
-		struct ion_buffer *buffer = rb_entry(n, struct ion_buffer,
-											 node);
-		mutex_lock(&buffer->lock);
-		total_size += buffer->size;
-		printk("%20.s %16.s %4u %16.s %4u %10zu %4d %3d %6d \n", buffer->heap->name,
-				   buffer->task_comm, buffer->pid,
-				   buffer->thread_comm,
-				   buffer->tid, buffer->size, buffer->kmap_cnt,
-				   atomic_read(&buffer->ref.refcount),
-				   buffer->handle_count);
-		mutex_unlock(&buffer->lock);
-	}
-	mutex_unlock(&dev->buffer_lock);
-
-	printk("------------------------------------------"
-			   "----------------------------------------"
-			   "----------------------------------------"
-			   "--------------------------------------\n");
-	printk("%16.s %16zu\n", "total ", total_size);
-	printk("------------------------------------------"
-			   "----------------------------------------"
-			   "----------------------------------------"
-			   "--------------------------------------\n");
-}
-EXPORT_SYMBOL(show_ion_buffer_size);
 
 static int ion_debug_buffer_open(struct inode *inode, struct file *file)
 {

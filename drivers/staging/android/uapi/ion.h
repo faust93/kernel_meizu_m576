@@ -42,7 +42,7 @@ enum ion_heap_type {
 	ION_HEAP_TYPE_DMA,
 	ION_HEAP_TYPE_CUSTOM, /* must be last so device specific heaps always
 				 are at the end of this enum */
-	ION_NUM_HEAPS = 20,
+	ION_NUM_HEAPS = 16,
 };
 
 #define ION_HEAP_SYSTEM_MASK		(1 << ION_HEAP_TYPE_SYSTEM)
@@ -113,6 +113,13 @@ struct ion_allocation_data {
 struct ion_fd_data {
 	ion_user_handle_t handle;
 	int fd;
+};
+
+struct ion_fd_partial_data {
+	ion_user_handle_t handle;
+	int fd;
+	off_t offset;
+	size_t len;
 };
 
 /**
@@ -214,6 +221,7 @@ struct ion_preload_data {
  * this will make the buffer in memory coherent.
  */
 #define ION_IOC_SYNC		_IOWR(ION_IOC_MAGIC, 7, struct ion_fd_data)
+#define ION_IOC_SYNC_PARTIAL	_IOWR(ION_IOC_MAGIC, 9, struct ion_fd_partial_data)
 
 /**
  * DOC: ION_IOC_PRELOAD_ALLOC - prefetches pages to page pool
