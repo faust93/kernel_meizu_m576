@@ -71,12 +71,12 @@ static void __ion_secure_protect(struct exynos_ion_platform_heap *pdata)
 	spin_lock(&smc_lock);
 
 	/* passing region info */
-	BUG_ON(exynos_smc(SMC_DRM_SECMEM_REGION_INFO, pdata->id - 1,
-			pdata->rmem->base, pdata->rmem->size) != 0);
+//	BUG_ON(exynos_smc(SMC_DRM_SECMEM_REGION_INFO, pdata->id - 1,
+//			pdata->rmem->base, pdata->rmem->size) != 0);
 
 	/* protection */
-	BUG_ON(exynos_smc(SMC_DRM_SECMEM_REGION_PROT, pdata->id - 1,
-				SMC_PROTECTION_ENABLE, 0) != 0);
+//	BUG_ON(exynos_smc(SMC_DRM_SECMEM_REGION_PROT, pdata->id - 1,
+//				SMC_PROTECTION_ENABLE, 0) != 0);
 
 	spin_unlock(&smc_lock);
 
@@ -356,6 +356,9 @@ DECLARE_EXYNOS_ION_RESERVED_REGION(sectbl);
 DECLARE_EXYNOS_ION_RESERVED_REGION(mfc_fw);
 DECLARE_EXYNOS_ION_RESERVED_REGION(mfc_nfw);
 DECLARE_EXYNOS_ION_RESERVED_REGION(secdma);
+DECLARE_EXYNOS_ION_RESERVED_REGION(seclog);
+DECLARE_EXYNOS_ION_RESERVED_REGION(reset_reason);
+DECLARE_EXYNOS_ION_RESERVED_REGION(ramoops);
 
 int ion_exynos_contig_heap_info(int region_id, phys_addr_t *phys, size_t *size)
 {
