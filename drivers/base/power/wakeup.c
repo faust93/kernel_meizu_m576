@@ -14,9 +14,13 @@
 #include <linux/suspend.h>
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
+#include <linux/moduleparam.h>
 #include <trace/events/power.h>
 
 #include "power.h"
+
+static bool fts_tp_wl = false;
+module_param(fts_tp_wl, bool, 0644);
 
 /*
  * If set, the suspend/hibernate code will abort transitions to a sleep state
@@ -401,6 +405,11 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 	if (WARN(wakeup_source_not_registered(ws),
 			"unregistered wakeup source\n"))
 		return;
+
+        if (!fts_tp_wl && !strcmp(ws->name, "fts_tp")) {
+        pr_info("wakeup source fts_tp activate skipped\n");
+                return;
+                    }
 
 	/*
 	 * active wakeup source should bring the system
