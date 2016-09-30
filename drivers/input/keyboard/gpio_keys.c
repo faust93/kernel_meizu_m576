@@ -42,6 +42,8 @@
 
 #define	LINK_KOBJ_NAME	"key"
 
+int home_key_state = 0;
+
 struct gpio_button_data {
 	const struct gpio_keys_button *button;
 	struct input_dev *input;
@@ -65,6 +67,13 @@ struct gpio_keys_drvdata {
 };
 
 static BLOCKING_NOTIFIER_HEAD(hall_notifier_list);
+
+/* return home key state: 1 down, 0 up */
+int get_home_key_state(void)
+{
+	return home_key_state;
+}
+EXPORT_SYMBOL(get_home_key_state);
 
 /**
  *	input_register_notifier_client - register a input client notifier
@@ -411,6 +420,9 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	}
 	input_sync(input);
 
+	if(button->code == 102)
+	    home_key_state = state;
+	
 #if defined(CONFIG_JANUARY_BOOSTER) && defined(CONFIG_KEY_BOOSTER)
 	if (type != EV_ABS)
 		janeps_input_report(!!state ? DOWN : UP, 0, 0);

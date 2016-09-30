@@ -26,7 +26,7 @@
 #include "fpc1020_navlib.h"
 #endif
 
-
+extern int get_home_key_state(void);
 /* -------------------------------------------------------------------- */
 /* function prototypes							*/
 /* -------------------------------------------------------------------- */
@@ -432,7 +432,7 @@ static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int fing
 	unsigned long tick_curr = jiffies * 1000 / HZ;
 	unsigned long duration = 0;
 
-	if ( finger_status == FNGR_ST_DETECTED ) {
+	if ( finger_status == FNGR_ST_DETECTED && !get_home_key_state() ) {
 		tick_down = tick_curr;
 	}
 
@@ -498,7 +498,6 @@ static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int fing
                     else
                     {
                         printk("[FPC] %s: prepare long press\n", __func__);
-                        //if (deviation < THRESHOLD_RANGE_MIN_TAP)
                         filtered_finger_status = FNGR_ST_HOLD;// FNGR_ST_L_HOLD;
                         fpc1020->nav.tap_status = -1;
                         tick_down = 0;
@@ -1010,10 +1009,16 @@ int fpc1020_input_task(fpc1020_data_t *fpc1020)
 		if (error < 0)
 			break;
 
-        error = fpc1020_write_nav_setup(fpc1020);
-        if (error < 0)
-        { break; }
-        error = fpc1020_check_finger_present_raw(fpc1020);
+                if(get_home_key_state()){
+                    msleep(1000);
+                    continue;
+                }
+
+                 error = fpc1020_write_nav_setup(fpc1020);
+                 if (error < 0)
+                    break;
+
+                error = fpc1020_check_finger_present_raw(fpc1020);
 //
 		process_navi_event(fpc1020, 0, 0, FNGR_ST_DETECTED);
 //
@@ -1024,7 +1029,7 @@ int fpc1020_input_task(fpc1020_data_t *fpc1020)
 
 		memcpy(fpc1020->prev_img_buf, fpc1020->huge_buffer, NAV_IMAGE_WIDTH * NAV_IMAGE_HEIGHT);
 
-		while (!fpc1020->worker.stop_request && (error >= 0)) {
+		while (!fpc1020->worker.stop_request && (error >= 0) && !get_home_key_state()) {
 
 			if(isReverse) {
 				prevBuffer = fpc1020->cur_img_buf;
@@ -1054,7 +1059,7 @@ int fpc1020_input_task(fpc1020_data_t *fpc1020)
 			sumX += dx;
 			sumY += dy;
 
-            pr_info("[FPC] get_movement dx=%d, dy=%d, sumx=%d, sumy=%d\n", dx, dy, sumX, sumY);
+                        //pr_info("[FPC] get_movement dx=%d, dy=%d, sumx=%d, sumy=%d\n", dx, dy, sumX, sumY);
 
 			diffTime = abs(jiffies - fpc1020->nav.time);
 			if(diffTime > 0) {
