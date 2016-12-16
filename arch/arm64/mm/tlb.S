@@ -22,7 +22,6 @@
 #include <asm/asm-offsets.h>
 #include <asm/page.h>
 #include <asm/tlbflush.h>
-#include "proc-macros.S"
 
 /*
  *	__cpu_flush_user_tlb_range(start, end, vma)

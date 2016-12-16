@@ -25,6 +25,10 @@
 
 #include "common.h"
 
+#ifdef CONFIG_KEXEC_HARDBOOT
+#include <asm/kexec.h>
+#endif
+
 #define REBOOT_MODE_NORMAL			0x00
 #define REBOOT_MODE_CHARGE			0x0A
 /* Reboot into fastboot mode */
@@ -123,11 +127,24 @@ static void __init m86_dt_map_io(void)
 	exynos_init_io(NULL, 0);
 }
 
+#ifdef CONFIG_KEXEC_HARDBOOT
+static void exynos_kexec_hardboot_hook(void)
+{
+//	__raw_writel(0x0, EXYNOS_PMU_SWRESET);
+}
+#endif
+
 static void __init m86_dt_machine_init(void)
 {
+
+	void __iomem *addr = EXYNOS_PMU_SWRESET;
+
 	of_platform_bus_probe(NULL, of_iommu_bus_match_table, NULL);
 	exynos_pmu_init();
 	m86_power_off_init();
+#ifdef CONFIG_KEXEC_HARDBOOT
+       kexec_hardboot_hook = exynos_kexec_hardboot_hook;
+#endif
 }
 
 static char const *m86_dt_compat[] __initdata = {

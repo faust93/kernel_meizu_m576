@@ -59,6 +59,9 @@
 #include <asm/early_ioremap.h>
 
 #include <asm/mach/arch.h>
+
+#include <linux/tick.h>
+
 extern void paging_init(struct machine_desc *);
 
 unsigned int processor_id;
@@ -585,3 +588,12 @@ const struct seq_operations cpuinfo_op = {
 	.stop	= c_stop,
 	.show	= c_show
 };
+
+static int __init dumphardboot(void) {
+	unsigned long *h = ioremap(0xf9800000, SZ_1M);
+	pr_info("Hardboot: %lx %lx %lx %lx %lx %lx %lx %lx\n",
+		h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]);
+	iounmap(h);
+	return 0;
+}
+arch_initcall(dumphardboot);

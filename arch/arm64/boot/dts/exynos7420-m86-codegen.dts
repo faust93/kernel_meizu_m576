@@ -36,6 +36,10 @@
 		#size-cells = <1>;
 		ranges;
 
+		hardboot {
+			reg = <0xF9800000 0x100000>;
+		};
+
 		common {
 			compatible = "exynos5433-ion,common";
 			reg = <0xE2000000 0x600000>;
