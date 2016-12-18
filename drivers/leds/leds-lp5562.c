@@ -173,6 +173,9 @@ static const u8 mode_1[] = { 0x0d, 0x7F, 0x0d, 0x7F, 0x4d, 0x00, 0x0d, 0xFF, 0x0
 /* mode_3:test */
 static const u8 mode_3[] = { 0x42, 0x7F, 0x42, 0x7F, 0x42, 0xFF, 0x42, 0xFF, 0x7F, 0x00};
 
+/* mode_4:custom */
+static u8 mode_my[100] = {0};
+
 struct lp55xx_predef_pattern lp5562_led_patterns[] = {
 	{
 		.r = mode_1,
@@ -530,12 +533,13 @@ static int lp5562_run_predef_led_pattern(struct lp55xx_chip *chip, int mode)
 		return 0;
 	}
 
-	ptn = chip->pdata->patterns + (mode - 1);
-	if (!ptn || _is_pc_overflow(ptn)) {
+        if(mode != 4) {
+	    ptn = chip->pdata->patterns + (mode - 1);
+	    if (!ptn || _is_pc_overflow(ptn)) {
 		dev_err(&chip->cl->dev, "invalid pattern data\n");
 		return -EINVAL;
-	}
-
+	    }
+        }
 	gpio_set_value(chip->pdata->en_gpio, 1);
 	usleep_range(1000, 1100);
 
@@ -566,8 +570,13 @@ static int lp5562_run_predef_led_pattern(struct lp55xx_chip *chip, int mode)
 */
 
 	/* Program engines */
-	lp5562_write_program_memory(chip, LP5562_REG_PROG_MEM_ENG1,
+	if (mode == 4) {
+        	lp5562_write_program_memory(chip, LP5562_REG_PROG_MEM_ENG1, 
+        	    mode_my + 1, mode_my[0]);
+        } else {
+        	lp5562_write_program_memory(chip, LP5562_REG_PROG_MEM_ENG1,
 				ptn->r, ptn->size_r);
+        }
 /*
 	lp5562_write_program_memory(chip, LP5562_REG_PROG_MEM_ENG2,
 				ptn->g, ptn->size_g);
@@ -578,6 +587,51 @@ static int lp5562_run_predef_led_pattern(struct lp55xx_chip *chip, int mode)
 	lp5562_run_engine(chip, true);
 
 	return 0;
+}
+
+static ssize_t lp5562_store_my_pattern(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t len)
+{
+	char *head = NULL, *ptr = NULL;
+	int i = 0, ret;
+
+	if (len > 100 || len == 0)
+		return -EINVAL;
+
+	memset(&mode_my, 0, sizeof(mode_my));
+
+	head = (char *)buf;
+	while (*head != 0 && i < 100) {
+		ptr = strchr(head, ',');
+		if (ptr == NULL) {
+			ret = -EFAULT;
+			goto cont_err;
+		}
+		*ptr = 0;
+		ret = kstrtou8(head, 0, &mode_my[i]);
+		if (ret) {
+			ret = -EFAULT;
+			goto cont_err;
+		}
+
+		head = ptr + 1;
+		i++;
+	}
+
+cont_err:
+	return ret;
+}
+
+static ssize_t lp5562_show_my_pattern(struct device *dev, struct device_attribute *attr,char *buf)
+{
+	int count=0;
+	int i;
+
+	for(i = 0;i < 100; i++){
+        	count+=sprintf(buf+count, "[%x] = (%x)\n",i, mode_my[i]);
+	}
+	return count;
 }
 
 static ssize_t lp5562_store_pattern(struct device *dev,
@@ -595,7 +649,7 @@ static ssize_t lp5562_store_pattern(struct device *dev,
 	if (ret)
 		return ret;
 
-	if (mode > num_patterns || !ptn)
+	if (mode > num_patterns + 1 || !ptn)
 		return -EINVAL;
 
 	mutex_lock(&chip->lock);
@@ -680,12 +734,13 @@ static ssize_t lp5562_reg_show(struct device *dev, struct device_attribute *attr
 static DEVICE_ATTR(led_pattern, S_IWUSR, NULL, lp5562_store_pattern);
 static DEVICE_ATTR(engine_mux, S_IWUSR, NULL, lp5562_store_engine_mux);
 static DEVICE_ATTR(reg, 0444, lp5562_reg_show, NULL);
-
+static DEVICE_ATTR(my_pattern, 0666, lp5562_show_my_pattern, lp5562_store_my_pattern);
 
 static struct attribute *lp5562_attributes[] = {
 	&dev_attr_led_pattern.attr,
 	&dev_attr_engine_mux.attr,
 	&dev_attr_reg.attr,
+	&dev_attr_my_pattern.attr,
 	NULL,
 };
 
