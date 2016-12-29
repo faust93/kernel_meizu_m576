@@ -2,11 +2,11 @@
  * fs/sdcardfs/file.c
  *
  * Copyright (c) 2013 Samsung Electronics Co. Ltd
- *   Authors: Daeho Jeong, Woojoong Lee, Seunghwan Hyun, 
+ *   Authors: Daeho Jeong, Woojoong Lee, Seunghwan Hyun,
  *               Sunghwan Yun, Sungjong Seo
- *                      
+ *
  * This program has been developed as a stackable file system based on
- * the WrapFS which written by 
+ * the WrapFS which written by
  *
  * Copyright (c) 1998-2011 Erez Zadok
  * Copyright (c) 2009     Shrikar Archak
@@ -143,6 +143,7 @@ static int sdcardfs_mmap(struct file *file, struct vm_area_struct *vma)
 	bool willwrite;
 	struct file *lower_file;
 	const struct vm_operations_struct *saved_vm_ops = NULL;
+
 	/* this might be deferred to mmap's writepage */
 	willwrite = ((vma->vm_flags | VM_SHARED | VM_WRITE) == vma->vm_flags);
 
@@ -206,7 +207,7 @@ static int sdcardfs_open(struct inode *inode, struct file *file)
 	struct path lower_path;
 	struct dentry *dentry = file->f_path.dentry;
 	struct dentry *parent = dget_parent(dentry);
-	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb); 
+	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
 	const struct cred *saved_cred = NULL;
 
 	/* don't open unhashed/deleted files */
@@ -214,9 +215,9 @@ static int sdcardfs_open(struct inode *inode, struct file *file)
 		err = -ENOENT;
 		goto out_err;
 	}
-	
+
 	if(!check_caller_access_to_name(parent->d_inode, dentry->d_name.name)) {
-		printk(KERN_INFO "%s: need to check the caller's gid in packages.list\n" 
+		printk(KERN_INFO "%s: need to check the caller's gid in packages.list\n"
                          "	dentry: %s, task:%s\n",
 						 __func__, dentry->d_name.name, current->comm);
 		err = -EACCES;
@@ -235,8 +236,9 @@ static int sdcardfs_open(struct inode *inode, struct file *file)
 	}
 
 	/* open lower object and link sdcardfs's file struct to lower's */
-	sdcardfs_copy_lower_path(file->f_path.dentry, &lower_path);
+	sdcardfs_get_lower_path(file->f_path.dentry, &lower_path);
 	lower_file = dentry_open(&lower_path, file->f_flags, current_cred());
+	path_put(&lower_path);
 	if (IS_ERR(lower_file)) {
 		err = PTR_ERR(lower_file);
 		lower_file = sdcardfs_lower_file(file);
@@ -251,10 +253,7 @@ static int sdcardfs_open(struct inode *inode, struct file *file)
 	if (err)
 		kfree(SDCARDFS_F(file));
 	else {
-		mutex_lock(&inode->i_mutex);
-		sdcardfs_copy_inode_attr(inode, sdcardfs_lower_inode(inode));
-		fix_derived_permission(inode);
-		mutex_unlock(&inode->i_mutex);
+		sdcardfs_copy_and_fix_attrs(inode, sdcardfs_lower_inode(inode));
 	}
 
 out_revert_cred:
@@ -291,19 +290,23 @@ static int sdcardfs_file_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-sdcardfs_fsync(struct file *file, loff_t start, loff_t end, int datasync)
+static int sdcardfs_fsync(struct file *file, loff_t start, loff_t end,
+			int datasync)
 {
 	int err;
 	struct file *lower_file;
 	struct path lower_path;
 	struct dentry *dentry = file->f_path.dentry;
 
+	err = generic_file_fsync(file, start, end, datasync);
+	if (err)
+		goto out;
+
 	lower_file = sdcardfs_lower_file(file);
 	sdcardfs_get_lower_path(dentry, &lower_path);
 	err = vfs_fsync_range(lower_file, start, end, datasync);
 	sdcardfs_put_lower_path(dentry, &lower_path);
-
+out:
 	return err;
 }
 

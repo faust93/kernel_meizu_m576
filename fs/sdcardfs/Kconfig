@@ -1,6 +1,7 @@
 config SDCARD_FS
 	tristate "sdcard file system"
-	default y
+	depends on CONFIGFS_FS
+	default n
 	help
 	  Sdcardfs is based on Wrapfs file system.
 
@@ -11,14 +12,11 @@ config SDCARD_FS_FADV_NOACTIVE
 	help
 	  Sdcardfs supports fadvise noactive mode.
 
-config SDCARD_FS_CI_SEARCH
-	tristate "sdcardfs case-insensitive search support"
+config CONFIG_SDCARD_FS_ANDROID_PKGLIST
+	bool "Read Android packages.list from filesystem"
 	depends on SDCARD_FS
 	default y
-
-config SDCARD_FS_XATTR
-	bool "Sdcardfs extended attribute"
-	default y
-	depends on SDCARD_FS
 	help
-	  Modification of sdcard file system for xattr
+	  Support for reading Android's package list directly from
+	  the filesystem. Disable this if you have support for the
+	  configfs API in userspace.
