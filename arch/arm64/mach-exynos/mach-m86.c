@@ -137,8 +137,6 @@ static void exynos_kexec_hardboot_hook(void)
 static void __init m86_dt_machine_init(void)
 {
 
-	void __iomem *addr = EXYNOS_PMU_SWRESET;
-
 	of_platform_bus_probe(NULL, of_iommu_bus_match_table, NULL);
 	exynos_pmu_init();
 	m86_power_off_init();
