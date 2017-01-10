@@ -515,6 +515,19 @@ int bq2589x_set_input_volt_limit(struct bq2589x *bq,int volt)
 }
 EXPORT_SYMBOL_GPL(bq2589x_set_input_volt_limit);
 
+int bq2589x_get_input_volt_limit(struct bq2589x *bq)
+{
+	u8 val=0;
+	int ret =0;
+
+	ret = bq2589x_read_byte(bq,&val,BQ2589X_REG_0D);
+	if(ret < 0){
+		pr_err(TAG"%s read fail\n",__func__);
+	}
+
+	return (val & BQ2589X_VINDPM_MASK) * BQ2589X_VINDPM_LSB + BQ2589X_VINDPM_BASE;
+}
+
 int bq2589x_set_input_current_limit(struct bq2589x *bq,int curr)
 {
 	u8 val;
@@ -914,11 +927,13 @@ static int bq2589x_charge_status(struct bq2589x * bq)
 	}
 	val &= BQ2589X_CHRG_STAT_MASK;
 	val >>= BQ2589X_CHRG_STAT_SHIFT;
+
 	if(bq2589x_get_pg(bq)){
 		return POWER_SUPPLY_CHARGE_TYPE_FAST;
 	}else{
 		return POWER_SUPPLY_CHARGE_TYPE_NONE;
 	}
+
 	switch(val){
 		case BQ2589X_CHRG_STAT_FASTCHG:
 			return POWER_SUPPLY_CHARGE_TYPE_FAST;
@@ -936,6 +951,8 @@ static int bq2589x_charge_status(struct bq2589x * bq)
 static enum power_supply_property bq2589x_charger_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_TYPE, /* Charger status output */
 	POWER_SUPPLY_PROP_ONLINE, /* External power source */
+        POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 };
 
 static int bq2589x_usb_get_property(struct power_supply *psy,
@@ -962,6 +979,12 @@ static int bq2589x_usb_get_property(struct power_supply *psy,
 		case POWER_SUPPLY_PROP_CHARGE_TYPE:
 			val->intval = bq2589x_charge_status(bq);
 			break;
+        	case POWER_SUPPLY_PROP_CURRENT_MAX:
+                        val->intval = bq2589x_get_input_current_limit(bq);
+                        break;
+        	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+                        val->intval = bq2589x_get_input_volt_limit(bq) * 1000;
+                        break;
 		default:
 			return -EINVAL;
 	}
@@ -995,6 +1018,12 @@ static int bq2589x_wall_get_property(struct power_supply *psy,
 		case POWER_SUPPLY_PROP_CHARGE_TYPE:
 			val->intval = bq2589x_charge_status(bq);
 			break;
+        	case POWER_SUPPLY_PROP_CURRENT_MAX:
+                        val->intval = bq2589x_get_input_current_limit(bq);
+                        break;
+        	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+                        val->intval = bq2589x_get_input_volt_limit(bq) * 1000;
+                        break;
 		default:
 			return -EINVAL;
 	}
@@ -1079,10 +1108,12 @@ int bq2589x_read_vbus_volt(struct bq2589x *bq)
 	}while(ret == 0 && (val & BQ2589X_CONV_START_MASK));
 
 	ret = g_bq1->vbus_volt= bq2589x_adc_read_vbus_volt(bq);
-	//pr_info(TAG"battery_volt = %d\n",bq2589x_adc_read_battery_volt(bq));
-	//pr_info(TAG"charge_current = %d\n",bq2588x_adc_read_charge_current(bq));
-	//pr_info(TAG"sys_volt = %d\n",bq2589x_adc_read_sys_volt(bq));
-	//pr_info(TAG"chip temperature = %d\n",bq2589x_adc_read_temperature(bq));
+
+	pr_info(TAG"vbus_volt = %d\n",bq2589x_adc_read_vbus_volt(bq));
+	pr_info(TAG"battery_volt = %d\n",bq2589x_adc_read_battery_volt(bq));
+	pr_info(TAG"charge_current = %d\n",bq2589x_adc_read_charge_current(bq));
+	pr_info(TAG"sys_volt = %d\n",bq2589x_adc_read_sys_volt(bq));
+	pr_info(TAG"chip temperature = %d\n",bq2589x_adc_read_temperature(bq));
 	//bq2589x_adc_stop(bq);
 
 	return ret;
