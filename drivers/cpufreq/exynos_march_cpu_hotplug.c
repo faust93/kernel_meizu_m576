@@ -33,15 +33,96 @@
 #define DEFAULT_CLUSTER1_HOTPLUG_IN_LOAD_THRSHD 240
 #define DEFAULT_CLUSTER1_HOTPLUG_OUT_LOAD_THRSHD 240
 
+extern unsigned long avg_cpu_nr_running(unsigned int cpu);
+
 struct cpu_load_info {
-	cputime64_t prev_cpu_idle;
-	cputime64_t prev_cpu_wall;
-	cputime64_t prev_cpu_iowait;
 	unsigned int cur_freq;
-	spinlock_t cpu_load_lock;
+	unsigned long cpu_nr_running;
+	unsigned long cpu_up_time;
 };
 
 static DEFINE_PER_CPU(struct cpu_load_info, cpuload);
+
+#define DEF_HYSTERESIS                  (10)
+#define DEF_LOAD_THRESH                 (70)
+#define DEF_SAMPLING_MS                 (200)
+
+#define DEFAULT_MIN_CPUS_ONLINE        1
+#define DEFAULT_MAX_CPUS_ONLINE        8
+#define DEFAULT_MIN_UP_TIME            500
+
+#define DEFAULT_NR_FSHIFT              3
+
+#define THREAD_CAPACITY                400
+
+#define CPU_NR_THRESHOLD               ((THREAD_CAPACITY << 1) - (THREAD_CAPACITY >> 1))
+
+/* HotPlug Driver controls */
+static unsigned int min_cpus_online = DEFAULT_MIN_CPUS_ONLINE;
+module_param(min_cpus_online, uint, 0664);
+
+
+static unsigned int max_cpus_online_tmp = DEFAULT_MAX_CPUS_ONLINE;
+static unsigned int max_cpus_online = DEFAULT_MAX_CPUS_ONLINE;
+module_param(max_cpus_online, uint, 0664);
+
+static unsigned int min_cpu_up_time = DEFAULT_MIN_UP_TIME;
+module_param(min_cpu_up_time, uint, 0664);
+
+static unsigned int min_cpu_boosted = 1;
+module_param(min_cpu_boosted, uint, 0664);
+
+static unsigned int cpu_nr_run_threshold = CPU_NR_THRESHOLD;
+module_param(cpu_nr_run_threshold, uint, 0664);
+
+static unsigned int current_profile_no = 2;
+module_param(current_profile_no, uint, 0664);
+
+static unsigned int nr_run_thresholds_balanced[] = {
+        THREAD_CAPACITY * 1,
+        THREAD_CAPACITY * 4,
+        THREAD_CAPACITY * 8,
+        THREAD_CAPACITY * 15,
+        THREAD_CAPACITY * 20,
+        THREAD_CAPACITY * 30,
+        THREAD_CAPACITY * 59,
+        THREAD_CAPACITY * 70,
+	UINT_MAX
+};
+
+static unsigned int nr_run_thresholds_cons[] = {
+        THREAD_CAPACITY * 3,
+        THREAD_CAPACITY * 6,
+        THREAD_CAPACITY * 11,
+        THREAD_CAPACITY * 18,
+        THREAD_CAPACITY * 23,
+        THREAD_CAPACITY * 35,
+        THREAD_CAPACITY * 66,
+        THREAD_CAPACITY * 88,
+	UINT_MAX
+};
+
+static unsigned int nr_run_thresholds_eco[] = {
+        200,
+        THREAD_CAPACITY * 2,
+        THREAD_CAPACITY * 4,
+        THREAD_CAPACITY * 8,
+        UINT_MAX
+};
+
+static unsigned int nr_run_thresholds_disable[] = {
+	0, 0, 0, 0, 0, 0, 0, 0, UINT_MAX
+};
+
+static unsigned int *nr_run_profiles[] = {
+	nr_run_thresholds_balanced,
+	nr_run_thresholds_eco,
+	nr_run_thresholds_cons,
+	nr_run_thresholds_disable
+};
+
+static unsigned int cl1_booster = 1;
+module_param(cl1_booster, uint, 0664);
 
 static DEFINE_MUTEX(march_hotplug_lock);
 static DEFINE_MUTEX(march_thread_lock);
@@ -50,7 +131,6 @@ static DEFINE_MUTEX(cluster0_hotplug_lock);
 static spinlock_t march_lock;
 
 static struct task_struct *march_hotplug_task;
-static wait_queue_head_t march_poll_wait;
 
 enum current_status {
 	CURR_NORMAL = 0x0,
@@ -59,7 +139,7 @@ enum current_status {
 };
 
 #define NORMAL_MODE_POLLING_MSEC 100
-#define LOWPOWER_MODE_POLLING_MSEC 500
+#define LOWPOWER_MODE_POLLING_MSEC 800
 
 static unsigned int polling_time[CURR_END] = {
 	NORMAL_MODE_POLLING_MSEC,
@@ -91,9 +171,9 @@ static unsigned int cluster1_init_stay_count_by_hmp =DEFAULT_CLUSTER1_STAY_CNT_H
 static unsigned int low_power_thread_threshold = DEFAULT_LOW_POWER_TRRESHOLD_THRESHD;
 static unsigned int low_power_stay_count_threshold = DEFAULT_LOW_POWER_STAY_COUNT_THRESHOLD;
 static unsigned long low_power_current_thread;
-static unsigned int cluster0_load_at_maxfreq = 0;
-static unsigned int cluster1_load_at_maxfreq = 0;
-static unsigned int cur_cluster1_onoff = 0;
+//static unsigned int cluster0_load_at_maxfreq = 0;
+//static unsigned int cluster1_load_at_maxfreq = 0;
+static unsigned int cur_cluster1_core_num = 0;
 static unsigned int cur_cluster0_core_num = 4;
 #endif
 
@@ -101,31 +181,10 @@ static unsigned int cur_cluster0_core_num = 4;
 static unsigned int cluster1_min_freq;
 #endif
 
-static bool march_pthread_started = false;
-static bool march_poll_waiting = false;
-
-struct k_data {
-	enum current_status	k_curr_status;
-	bool			k_lcd_is_on;
-	unsigned int		k_cluster_load;
-	int			k_cluster_load_invalid;
-	unsigned int		k_cluster1_hotplug_in_load_threshold;
-	unsigned int		k_cluster1_hotplug_out_load_threshold;
-	unsigned int		k_cluster1_stay_cnt_normal;
-	unsigned int		k_cluster1_stay_cnt_lowpower;
-	unsigned int		k_low_power_thread_threshold;
-	unsigned int		k_low_power_stay_count_threshold;
-	unsigned long		k_low_power_running_thread_nr;
-	unsigned int		k_log_onoff;
-};
-
 struct p_data {
 	unsigned int		p_cluster1_on_off;
 	unsigned int		p_target_cluster0;
 };
-
-static struct k_data march_kernel_data;
-static struct p_data hotplug_data;
 
 static struct pm_qos_request cluster1_num_max_qos;
 static struct pm_qos_request cluster1_num_min_qos;
@@ -142,7 +201,7 @@ static struct pm_qos_request sys_cluster0_num_max_qos;
 static struct pm_qos_request sys_cluster0_num_min_qos;
 
 static int on_run(void *data);
-static int calc_load_cluster(int cluster_num, unsigned int* load);
+//static int calc_load_cluster(int cluster_num, unsigned int* load);
 
 #if defined(CONFIG_SCHED_HMP)
 static struct workqueue_struct *hotplug_cluster0_wq;
@@ -201,17 +260,17 @@ static void decrease_cluster1_booster(void)
 }
 EXPORT_SYMBOL(decrease_cluster1_booster);
 
-static unsigned int get_cur_cluster1_onoff_status(void)
+static unsigned int get_cur_cluster1_core_num(void)
 {
-	return cur_cluster1_onoff;
+	return cur_cluster1_core_num;
 }
-EXPORT_SYMBOL(get_cur_cluster1_onoff_status);
+EXPORT_SYMBOL(get_cur_cluster1_core_num);
 
-static void set_cur_cluster1_onoff_status(unsigned int temp)
+static void set_cur_cluster1_core_num(unsigned int temp)
 {
-	cur_cluster1_onoff = temp;
+	cur_cluster1_core_num = temp;
 }
-EXPORT_SYMBOL(set_cur_cluster1_onoff_status);
+EXPORT_SYMBOL(set_cur_cluster1_core_num);
 
 static unsigned int get_cur_cluster0_core_num(void)
 {
@@ -301,7 +360,7 @@ static void march_hotplug_monitor(unsigned long data)
 	if (march_hotplug_task != NULL) {
 		wake_up_process(march_hotplug_task);
 
-		if(get_cur_cluster1_onoff_status() == 0) {
+		if(get_cur_cluster1_core_num() == 0) {
 			if (!timer_pending(&hotplug_timer))
 				mod_timer_pinned(&hotplug_timer, expires);
 		}
@@ -352,14 +411,21 @@ static int fb_state_change(struct notifier_block *nb,
 	case FB_BLANK_POWERDOWN:
 		lcd_is_on = false;
                 screen_is_on = false;
-#ifdef CONFIG_BCMDHD_PCIE
-		if(current_level >= 3){
-#endif
+//#ifdef CONFIG_BCMDHD_PCIE
+//		if(current_level >= 3){
+//#endif
 		if (pm_qos_request_active(&cluster1_num_max_qos))
 			pm_qos_update_request(&cluster1_num_max_qos, 0);
-#ifdef CONFIG_BCMDHD_PCIE
-		}
-#endif
+
+		if (pm_qos_request_active(&cluster0_num_max_qos))
+			pm_qos_update_request(&cluster0_num_max_qos, 1);
+                
+                max_cpus_online_tmp = max_cpus_online;
+                max_cpus_online = 3;
+
+//#ifdef CONFIG_BCMDHD_PCIE
+//		}
+//#endif
 		set_curr_status(CURR_LOWPOWER);
 		pr_info("LCD is off %d\n",get_curr_status());
 		break;
@@ -369,7 +435,12 @@ static int fb_state_change(struct notifier_block *nb,
                 screen_is_on = true;
 		if (pm_qos_request_active(&cluster1_num_max_qos))
 			pm_qos_update_request(&cluster1_num_max_qos, NR_CLUST1_CPUS);
-		set_curr_status(CURR_NORMAL);
+		if (pm_qos_request_active(&cluster0_num_max_qos))
+			pm_qos_update_request(&cluster0_num_max_qos, NR_CLUST0_CPUS);
+        	set_curr_status(CURR_NORMAL);
+
+                max_cpus_online = max_cpus_online_tmp;
+
 		pr_info("LCD is on %d\n",get_curr_status());
 		break;
 	default:
@@ -394,22 +465,6 @@ static int get_online_cpu_num_on_cluster(int cluster)
 
 	return cpumask_weight(&dst_cpumask);
 }
-
-void reset_calc_load_core(unsigned int cpu)
-{
-	struct cpu_load_info *pcpu = &per_cpu(cpuload, cpu);
-	cputime64_t cur_wall_time, cur_idle_time;
-	unsigned int idle_time, wall_time;
-
-	cur_idle_time = get_cpu_idle_time(cpu, &cur_wall_time);
-
-	wall_time = (unsigned int)(cur_wall_time - pcpu->prev_cpu_wall);
-	pcpu->prev_cpu_wall = cur_wall_time;
-
-	idle_time = (unsigned int)(cur_idle_time - pcpu->prev_cpu_idle);
-	pcpu->prev_cpu_idle = cur_idle_time;
-}
-EXPORT_SYMBOL(reset_calc_load_core);
 
 #if defined(CONFIG_SCHED_HMP)
 bool is_cluster1_hotplugged(void)
@@ -462,11 +517,29 @@ static int __ref ready_for_wakeup(void)
 	return ret;
 }
 
+//kek
+static void update_per_cpu_stat(void)
+{
+        unsigned int cpu;
+        struct cpu_load_info *pcpu;
+
+        for_each_online_cpu(cpu) {
+                pcpu = &per_cpu(cpuload, cpu);
+                pcpu->cpu_nr_running = avg_cpu_nr_running(cpu);
+            }
+
+        for_each_cpu_not(cpu, cpu_online_mask) {
+                pcpu = &per_cpu(cpuload, cpu);
+                pcpu->cpu_up_time = 0;
+            }
+}
+
 static int __ref change_core_num_cluster0(int target_num, int use_target)
 {
 	int ret = 0;
-	int cur_num, val, i = 0;
+	int cur_num, val, i = 0; //, l_nr_threshold = 0;
 	int max_limit, min_limit;
+        struct cpu_load_info *pcpu;
 
 	mutex_lock(&cluster0_hotplug_lock);
 
@@ -475,7 +548,7 @@ static int __ref change_core_num_cluster0(int target_num, int use_target)
 	max_limit = (int)pm_qos_request(PM_QOS_CLUSTER0_NUM_MAX);
 	min_limit = (int)pm_qos_request(PM_QOS_CLUSTER0_NUM_MIN);
 
-	if (get_curr_status() == CURR_NORMAL) {
+	if (get_curr_status() == CURR_NORMAL && use_target == 0) {
 		target_num = max_limit;
 	} else {
 		target_num = max(target_num, min_limit);
@@ -495,23 +568,26 @@ static int __ref change_core_num_cluster0(int target_num, int use_target)
 				pr_err("[%s]: up %d failed\n", __func__, i);
 				mutex_unlock(&cluster0_hotplug_lock);
 				return ret;
-			}
-			val--;
-	    }
+			    }
+                        pcpu = &per_cpu(cpuload, i);
+                        pcpu->cpu_up_time = ktime_to_ms(ktime_get());
+                        val--;
+                        }
 		}
 	} else if (target_num < cur_num) {
 		val = cur_num - target_num;
 		for (i = NR_CLUST0_CPUS - 1; i > 0 && val > 0; i--) {
-			if (cpu_online(i)) {
-				ret = cpu_down(i);
-				if (ret) {
-					pr_err("[%s]: down %d failed\n", __func__, i);
-					mutex_unlock(&cluster0_hotplug_lock);
-					return ret;
-				} else
-					reset_calc_load_core(i);
-				val--;
-			}
+		    if (cpu_online(i)){
+                        pcpu = &per_cpu(cpuload, i);
+		        if((ktime_to_ms(ktime_get()) - pcpu->cpu_up_time) >= min_cpu_up_time) {
+//                                l_nr_threshold = cpu_nr_run_threshold << 1 / (num_online_cpus());
+//				pr_err("[%s]: kek cpu%d nr: %lu l_nr: %d\n", __func__, i, pcpu->cpu_nr_running, l_nr_threshold);
+//                                if (pcpu->cpu_nr_running < l_nr_threshold)
+				     cpu_down(i);
+//					reset_calc_load_core(i);
+                                }
+			val--;
+		    }
 		}
 	}
 	set_cur_cluster0_core_num(get_online_cpu_num_on_cluster(CL_ZERO));
@@ -523,9 +599,10 @@ static int __ref change_core_num_cluster0(int target_num, int use_target)
 static __ref int change_core_num_cluster1(int cluster_on_off, int hmp_booster)
 {
 	int ret = 0;
-	int cur_num, val, i = 0;
+	int cur_num, val, i = 0; //, l_nr_threshold = 0;
 	int max_limit = 0xff, min_limit = 0xff;
 	int target_num = 0;
+        struct cpu_load_info *pcpu;
 
 	mutex_lock(&cluster1_hotplug_lock);
 	cur_num = get_online_cpu_num_on_cluster(CL_ONE);
@@ -535,17 +612,13 @@ static __ref int change_core_num_cluster1(int cluster_on_off, int hmp_booster)
 
 	if (hmp_booster != 0 &&  max_limit > 0) {
 		target_num = max_limit;
-	}
-	else if (cluster_on_off == 1 ) {
-		target_num = max_limit;
 	} else {
-		target_num = min_limit;
+		target_num = max(cluster_on_off, min_limit);
 	}
 
 	if (target_num != cur_num) {
-		if (log_onoff) {
+		if (log_onoff) 
 			printk("[%s] cur:%d target:%d max:%d min:%d\n", __func__, cur_num, target_num, max_limit,min_limit);
-		}
 	}
 
 	if (target_num > cur_num) {
@@ -559,6 +632,8 @@ static __ref int change_core_num_cluster1(int cluster_on_off, int hmp_booster)
 						mutex_unlock(&cluster1_hotplug_lock);
 						return ret;
 					}
+                                        pcpu = &per_cpu(cpuload, i);
+                                        pcpu->cpu_up_time = ktime_to_ms(ktime_get());
 				val--;
 			}
 		}
@@ -566,21 +641,14 @@ static __ref int change_core_num_cluster1(int cluster_on_off, int hmp_booster)
 		val = cur_num - target_num;
 		for (i = setup_max_cpus - 1; i >= NR_CLUST0_CPUS && val > 0; i--) {
 			if (cpu_online(i)) {
-				ret = cpu_down(i);
-				if (ret) {
-					pr_err("[%s]: down %d failed\n", __func__, i);
-					mutex_unlock(&cluster1_hotplug_lock);
-					return ret;
-				} else
-					reset_calc_load_core(i);
+                            pcpu = &per_cpu(cpuload, i);
+	        		 cpu_down(i);
+					//reset_calc_load_core(i);
 				val--;
-			}
+		    }
 		}
 	}
-	if (get_online_cpu_num_on_cluster(CL_ONE) == 0)
-		set_cur_cluster1_onoff_status(0);
-	else
-		set_cur_cluster1_onoff_status(1);
+	set_cur_cluster1_core_num(get_online_cpu_num_on_cluster(CL_ONE));
 	mutex_unlock(&cluster1_hotplug_lock);
 	return ret;
 }
@@ -717,132 +785,48 @@ static struct notifier_block exynos_march_hotplug_reboot_nb = {
 static int cpufreq_transition_notifier(struct notifier_block *nb,
 				      unsigned long val, void *data)
 {
-	struct cpufreq_freqs *freqs = data;
-	unsigned long flags;
+//	struct cpufreq_freqs *freqs = data;
 
 	switch (val) {
 	case CPUFREQ_POSTCHANGE:
-		/* flush previous laod */
-		spin_lock_irqsave(&per_cpu(cpuload, freqs->cpu).cpu_load_lock, flags);
-		reset_calc_load_core(freqs->cpu);
-		spin_unlock_irqrestore(&per_cpu(cpuload, freqs->cpu).cpu_load_lock, flags);
 		break;
 	}
 	return 0;
 }
 
-static int calc_load_core(unsigned int cpu, unsigned int *core_load_at_max_freq,
-						unsigned int cur_freq, unsigned int cluster_max_freq)
+//kek
+static unsigned int calculate_thread_stats(void)
 {
-	struct cpu_load_info *pcpu = &per_cpu(cpuload, cpu);
-	cputime64_t cur_wall_time, cur_idle_time;
-	unsigned int idle_time, wall_time;
-	unsigned int cur_load, load_at_max_freq = 0;
+	unsigned int avg_nr_run = avg_nr_running();
+	unsigned int nr_run;
+	unsigned int threshold_size;
+	unsigned int *current_profile = nr_run_profiles[current_profile_no];
 
-	cur_idle_time = get_cpu_idle_time(cpu, &cur_wall_time);
+	if(current_profile_no == 0)
+		threshold_size = ARRAY_SIZE(nr_run_thresholds_balanced);
+	else if(current_profile_no == 1)
+		threshold_size = ARRAY_SIZE(nr_run_thresholds_eco);
+	else if(current_profile_no == 2)
+		threshold_size = ARRAY_SIZE(nr_run_thresholds_cons);
 
-	wall_time = (unsigned int)(cur_wall_time - pcpu->prev_cpu_wall);
-	pcpu->prev_cpu_wall = cur_wall_time;
+	for (nr_run = 1; nr_run < threshold_size; nr_run++) {
+		unsigned int nr_threshold;
+		nr_threshold = current_profile[nr_run];
 
-	idle_time = (unsigned int)(cur_idle_time - pcpu->prev_cpu_idle);
-	pcpu->prev_cpu_idle = cur_idle_time;
-
-	if (unlikely(!wall_time))
-		return -1;
-
-	if (wall_time < idle_time) {
-		wall_time = idle_time;
+		if (avg_nr_run <= nr_threshold)
+			break;
 	}
 
-	cur_load = 100 * (wall_time - idle_time) / wall_time;
-
-	/* Calculate the scaled load across CPU */
-	load_at_max_freq = (cur_load * cur_freq) / cluster_max_freq;
-	*core_load_at_max_freq = load_at_max_freq;
-	return 0;
-}
-
-static int calc_load_cluster(int cluster_num, unsigned int *load)
-{
-	struct cpufreq_policy *policy;
-	unsigned int i;
-	unsigned int cur_freq, core_load,cluster_max_freq = 0;
-	unsigned int cluster_load = 0;
-
-	if (cluster_num == 0)
-		policy = cpufreq_cpu_get(0);
-	else if (cluster_num == 1)
-		policy = cpufreq_cpu_get(4);
-	else {
-		pr_err("Invalid parameter\n");
-		return -1;
-	}
-
-	if (!policy) {
-		pr_err("Invalid policy\n");
-		goto bad;
-	}
-
-	cur_freq = policy->cur;
-	cluster_max_freq = policy->max;
-
-	for_each_cpu_and(i, cpu_coregroup_mask(cluster_num * NR_CLUST1_CPUS), cpu_online_mask) {
-		int ret = 0;
-		unsigned long flags;
-		spin_lock_irqsave(&per_cpu(cpuload, i).cpu_load_lock, flags);
-		ret = calc_load_core(i, &core_load, cur_freq, cluster_max_freq);
-		spin_unlock_irqrestore(&per_cpu(cpuload, i).cpu_load_lock, flags);
-		if (!ret)
-			cluster_load += core_load;
-		else {
-			pr_warn("%s error:%d\n",__func__,ret);
-			continue;
-		}
-	}
-
-	if (cluster_num == 0)
-		cluster0_load_at_maxfreq = cluster_load;
-	else
-		cluster1_load_at_maxfreq = cluster_load;
-
-	cpufreq_cpu_put(policy);
-	*load = cluster_load;
-	return 0;
-bad:
-	return -1;
-}
-
-int calc_next_hotplug_num(int* cluster1_on_off, int* target_cluster0)
-{
-	unsigned long	flags;
-	int ret = 0;
-
-	if(march_pthread_started == false)
-		goto not_ready;
-
-	spin_lock_irqsave(&march_lock,flags);
-	if(march_poll_waiting == true) {
-		wake_up_interruptible(&march_poll_wait);
-		march_poll_waiting = false;
-	}
-	spin_unlock_irqrestore(&march_lock,flags);
-
-	*cluster1_on_off = hotplug_data.p_cluster1_on_off;
-	*target_cluster0 = hotplug_data.p_target_cluster0;
-
-	return ret;
-
-not_ready:
-	*cluster1_on_off = 1;
-	*target_cluster0 = 4;
-
-	return ret;
+	return nr_run;
 }
 
 static int on_run(void *data)
 {
 	int on_cpu = 0;
-	struct cpumask thread_cpumask;
+        unsigned int online_cpus;
+        int target = 1;
+
+        struct cpumask thread_cpumask;
 
 	cpumask_clear(&thread_cpumask);
 	cpumask_set_cpu(on_cpu, &thread_cpumask);
@@ -850,23 +834,49 @@ static int on_run(void *data)
 
 	mutex_lock(&march_thread_lock);
 	while (!kthread_should_stop()) {
-		unsigned int cluster1_core_onoff, cluster0_core_num;
-		calc_next_hotplug_num(&cluster1_core_onoff,&cluster0_core_num);
+		unsigned int cluster1_core_num, cluster0_core_num;
+
 		if (get_hotplug_running_status()) {
 			mutex_unlock(&march_thread_lock);
 			goto Sleep_Out;
 		}
 
-		if (get_cur_cluster1_booster_value() > 0) {
-			change_core_num_cluster1(cluster1_core_onoff,true);
+                target = calculate_thread_stats();
+                online_cpus = num_online_cpus();
+
+                if (target < min_cpus_online)
+                    target = min_cpus_online;
+                else if (target > max_cpus_online)
+                    target = max_cpus_online;
+
+                if(target == online_cpus)
+                    goto Skip_Cores;
+
+                if(target <= 4) {
+                    cluster0_core_num = target;
+                    cluster1_core_num = 0;
+                } else {
+                    cluster0_core_num = 4;
+                    cluster1_core_num = target - 4;
+                }
+//                pr_err("kek0 onlineCpus: %u c0cores: %u c1cores: %u target: %u\n", online_cpus, cluster0_core_num, cluster1_core_num, target);
+
+                update_per_cpu_stat();
+		
+		if (get_cur_cluster1_booster_value() > 0 && cl1_booster != 0 && lcd_is_on) {
+                    if(cluster1_core_num == 0)
+			change_core_num_cluster1(min_cpu_boosted, 0);
+                    else
+			change_core_num_cluster1(cluster1_core_num, 0);
 			decrease_cluster1_booster();
-		} else if (cluster1_core_onoff != get_cur_cluster1_onoff_status()) {
-			change_core_num_cluster1(cluster1_core_onoff,false);
+		} else if (cluster1_core_num != get_cur_cluster1_core_num()) {
+			change_core_num_cluster1(cluster1_core_num, 0);
 		}
 
 		if (cluster0_core_num != get_cur_cluster0_core_num()) {
 			change_core_num_cluster0(cluster0_core_num,1);
 		}
+Skip_Cores:
 		mutex_unlock(&march_thread_lock);
 		NonDeferedTime = cpufreq_interactive_get_down_sample_time()/USEC_PER_MSEC;
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -1293,7 +1303,6 @@ static ssize_t store_cl1_hotplug_in_threshold_by_hmp(struct kobject *kobj, struc
 extern struct time_in_state_info cl0_time_in_state;
 extern struct time_in_state_info cl1_time_in_state;
 
-
 static ssize_t show_time_in_state(struct kobject *kobj,
 				struct kobj_attribute *attr, char *buf)
 {
@@ -1429,121 +1438,6 @@ static const struct attribute_group *march_hotplug_sysfs_groups[] = {
 	NULL,
 };
 
-static struct proc_dir_entry *proc_march_dir;
-
-unsigned int init_march_kernel_data(void)
-{
-	unsigned long	flags;
-
-	spin_lock_irqsave(&march_lock,flags);
-	march_kernel_data.k_curr_status = CURR_NORMAL;
-	march_kernel_data.k_lcd_is_on = true;
-	march_kernel_data.k_cluster1_hotplug_in_load_threshold = DEFAULT_CLUSTER1_HOTPLUG_IN_LOAD_THRSHD;
-	march_kernel_data.k_cluster1_hotplug_out_load_threshold = DEFAULT_CLUSTER1_HOTPLUG_OUT_LOAD_THRSHD;
-	march_kernel_data.k_cluster1_stay_cnt_normal = DEFAULT_CLUSTER1_STAY_CNT_NORMAL;
-	march_kernel_data.k_cluster1_stay_cnt_lowpower = DEFAULT_CLUSTER1_STAY_CNT_LOWPOWER;
-	march_kernel_data.k_low_power_thread_threshold = DEFAULT_LOW_POWER_TRRESHOLD_THRESHD;
-	march_kernel_data.k_low_power_stay_count_threshold = DEFAULT_LOW_POWER_STAY_COUNT_THRESHOLD;
-	march_kernel_data.k_low_power_running_thread_nr = 0;
-	march_kernel_data.k_log_onoff = 0;
-	spin_unlock_irqrestore(&march_lock,flags);
-
-	return 0;
-}
-
-static ssize_t march_read(struct file *file, char __user *buf,
-			size_t size, loff_t *ppos)
-{
-	unsigned long	flags;
-	unsigned int	load;
-	ssize_t 	retval;
-
-	retval = sizeof(struct k_data);
-
-	spin_lock_irqsave(&march_lock,flags);
-	if (calc_load_cluster(0, &load) == 0)
-		march_kernel_data.k_cluster_load = load;
-	else
-		march_kernel_data.k_cluster_load_invalid = 1;
-
-	march_kernel_data.k_curr_status = get_curr_status();
-	march_kernel_data.k_cluster1_hotplug_in_load_threshold = cluster1_hotplug_in_load_threshold;
-	march_kernel_data.k_cluster1_hotplug_out_load_threshold = cluster1_hotplug_out_load_threshold;
-	march_kernel_data.k_cluster1_stay_cnt_normal = cluster1_stay_cnt_normal;
-	march_kernel_data.k_cluster1_stay_cnt_lowpower = cluster1_stay_cnt_lowpower;
-	march_kernel_data.k_lcd_is_on = lcd_is_on;
-	march_kernel_data.k_low_power_thread_threshold = low_power_thread_threshold;
-	march_kernel_data.k_low_power_stay_count_threshold = low_power_stay_count_threshold;
-	march_kernel_data.k_low_power_running_thread_nr = nr_running();
-	march_kernel_data.k_log_onoff = log_onoff;
-
-	if (copy_to_user(buf, &march_kernel_data, retval)) {
-		spin_unlock_irqrestore(&march_lock,flags);
-		printk(KERN_ERR " copy_to_user() failed!\n");
-
-		return -EFAULT;
-	}
-	spin_unlock_irqrestore(&march_lock,flags);
-
-	return retval;
-}
-
-static ssize_t march_write(struct file *file, const char __user *buf,
-			size_t size, loff_t *ppos)
-{
-	unsigned long flags;
-
-	if (size != sizeof(struct p_data))
-		return -1;
-
-	memset(&hotplug_data, 0, sizeof(struct p_data));
-
-	spin_lock_irqsave(&march_lock,flags);
-	if (copy_from_user((void *)(&hotplug_data), buf, size)) {
-		spin_unlock_irqrestore(&march_lock,flags);
-		printk(KERN_ERR " copy_from_user() failed!\n");
-
-		return -EFAULT;
-	}
-	spin_unlock_irqrestore(&march_lock,flags);
-
-	return size;
-}
-
-static unsigned int march_poll(struct file *file, poll_table *wait)
-{
-	unsigned long flags;
-	int mask = 0;
-
-	poll_wait(file, &march_poll_wait, wait);
-
-	spin_lock_irqsave(&march_lock,flags);
-	if(!march_poll_waiting) {
-		mask |= POLLPRI;
-		march_poll_waiting = true;
-	}
-	spin_unlock_irqrestore(&march_lock,flags);
-
-	return mask;
-}
-
-static int march_open(struct inode *inode, struct file *file)
-{
-	int ret = 0;
-
-	march_pthread_started = true;
-
-	return ret;
-}
-
-static const struct file_operations march_fileops = {
-	.owner		= THIS_MODULE,
-	.open		= march_open,
-	.read		= march_read,
-	.write		= march_write,
-	.poll		= march_poll,
-};
-
 int setup_hotplug_sysfs(void)
 {
 	int ret = 0;
@@ -1557,12 +1451,10 @@ int setup_hotplug_sysfs(void)
 
 static int __init march_cpu_hotplug_init(void)
 {
-	int ret, i = 0;
+	int ret;
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 	struct cpufreq_policy *policy;
 #endif
-	struct proc_dir_entry *entry;
-
 	unsigned long expires = jiffies + msecs_to_jiffies(polling_time[get_curr_status()]);
 	init_timer_deferrable(&hotplug_timer);
 	hotplug_timer.function = march_hotplug_monitor;
@@ -1572,17 +1464,13 @@ static int __init march_cpu_hotplug_init(void)
 	hotplug_timer_delay.function = march_hotplug_monitor;
 	hotplug_timer_delay.data = 0;	// Target Core on which the timer function run.
 
-	march_hotplug_task =
-		kthread_create(on_run, NULL, "thread_hotplug");
+	march_hotplug_task = kthread_create(on_run, NULL, "thread_hotplug");
+
 	if (IS_ERR(march_hotplug_task)) {
 		pr_err("Failed in creation of thread.\n");
 		return -EINVAL;
 	}
 
-	for_each_possible_cpu(i) {
-		struct cpu_load_info *pcpu = &per_cpu(cpuload, i);
-		spin_lock_init(&pcpu->cpu_load_lock);
-	}
 	spin_lock_init(&march_lock);
 
 	fb_register_client(&fb_block);
@@ -1635,19 +1523,6 @@ static int __init march_cpu_hotplug_init(void)
 	}
 
 #endif
-
-	proc_march_dir = proc_mkdir("march", NULL);
-	if (!proc_march_dir)
-		return -ENOMEM;
-
-	entry = proc_create("kernel_data", S_IRUGO|S_IWUGO, proc_march_dir,
-			    &march_fileops);
-	if (!entry)
-		goto err_remove;
-
-	init_march_kernel_data();
-	init_waitqueue_head(&march_poll_wait);
-
 	register_pm_notifier(&exynos_march_hotplug_nb);
 	register_reboot_notifier(&exynos_march_hotplug_reboot_nb);
 
@@ -1664,9 +1539,6 @@ static int __init march_cpu_hotplug_init(void)
 	wake_up_process(march_hotplug_task);
 
 	return ret;
-
-err_remove:
-	remove_proc_entry("kernel_data", proc_march_dir);
 
 #if defined(CONFIG_SCHED_HMP)
 err_wq:
