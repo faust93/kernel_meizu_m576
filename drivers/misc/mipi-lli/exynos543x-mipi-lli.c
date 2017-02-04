@@ -67,10 +67,6 @@ static int exynos_lli_get_clk_info(struct mipi_lli *lli)
 	clks->phyclk_lli_rx0_symbol = devm_clk_get(lli->dev,
 			"phyclk_lli_rx0_symbol");
 
-	/* To clock set_rate */
-	clks->dout_aclk_cpif_200 = devm_clk_get(lli->dev, "dout_aclk_cpif_200");
-	clks->dout_mif_pre = devm_clk_get(lli->dev, "dout_mif_pre");
-
 	if (IS_ERR(clks->aclk_cpif_200) ||
 		IS_ERR(clks->gate_cpifnm_200) ||
 		IS_ERR(clks->gate_lli_svc_loc) ||
@@ -85,9 +81,7 @@ static int exynos_lli_get_clk_info(struct mipi_lli *lli)
 		IS_ERR(clks->mout_phyclk_lli_tx0_symbol_user) ||
 		IS_ERR(clks->phyclk_lli_tx0_symbol) ||
 		IS_ERR(clks->mout_phyclk_lli_rx0_symbol_user) ||
-		IS_ERR(clks->phyclk_lli_rx0_symbol) ||
-		IS_ERR(clks->dout_aclk_cpif_200) ||
-		IS_ERR(clks->dout_mif_pre)
+		IS_ERR(clks->phyclk_lli_rx0_symbol)
 	) {
 		dev_err(lli->dev, "exynos_lli_get_clks - failed\n");
 		return -ENODEV;
@@ -113,12 +107,13 @@ static int exynos_lli_clock_init(struct mipi_lli *lli)
 
 static int exynos_lli_clock_div(struct mipi_lli *lli)
 {
-	int ret = clk_set_rate(lli->clks.dout_aclk_cpif_200, 100000000);
+	struct clk *dout_aclk_cpif_200 = clk_get(lli->dev, "dout_aclk_cpif_200");
+	struct clk *dout_mif_pre = clk_get(lli->dev, "dout_mif_pre");
 
-	dev_err(lli->dev, "dout_aclk_cpif_200 = %ld\n",
-			lli->clks.dout_aclk_cpif_200->rate);
-	dev_err(lli->dev, "dout_mif_pre= %ld\n",
-			lli->clks.dout_mif_pre->rate);
+	int ret = clk_set_rate(dout_aclk_cpif_200, 100000000);
+
+	dev_err(lli->dev, "dout_aclk_cpif_200 = %ld\n", dout_aclk_cpif_200->rate);
+	dev_err(lli->dev, "dout_mif_pre= %ld\n", dout_mif_pre->rate);
 
 	return ret;
 }

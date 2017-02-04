@@ -32,6 +32,9 @@
 #include <linux/of_reserved_mem.h>
 #include <linux/mipi-lli.h>
 
+/* IPC_MEMSIZE should be less than 4MB */
+#define IPC_MEMSIZE	(4 * SZ_1M)
+
 static struct mipi_lli *g_lli;
 phys_addr_t lli_phys_addr;
 
@@ -245,7 +248,7 @@ void mipi_lli_reload(void)
 }
 EXPORT_SYMBOL(mipi_lli_reload);
 
-static void __maybe_unused mipi_lli_send_signal_test(struct mipi_lli *lli)
+static void mipi_lli_send_signal_test(struct mipi_lli *lli)
 {
 	u32 i;
 
@@ -257,21 +260,16 @@ static ssize_t show_mipi_lli_control(struct device *dev,
 			       struct device_attribute *attr,
 			       char *buf)
 {
-#ifndef CONFIG_LINK_DEVICE_LLI
 	struct mipi_lli *lli = dev_get_drvdata(dev);
 
 	return snprintf(buf, PAGE_SIZE, "MIPI-LLI %x\n",
 			lli->driver->get_status(lli));
-#else
-	return snprintf(buf,PAGE_SIZE, "Cannot support sysfs interface\n");
-#endif
 }
 
 static ssize_t store_mipi_lli_control(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count)
 {
-#ifndef CONFIG_LINK_DEVICE_LLI
 	struct mipi_lli *lli = dev_get_drvdata(dev);
 	int command;
 
@@ -304,9 +302,7 @@ static ssize_t store_mipi_lli_control(struct device *dev,
 		dev_err(dev, "Un-support control command\n");
 
 	device_unlock(dev);
-#else
-	dev_err(dev, "Cannot support sysfs interface\n");
-#endif
+
 	return count;
 }
 static DEVICE_ATTR(lli_control, 0644,
@@ -353,12 +349,24 @@ EXPORT_SYMBOL(mipi_lli_intr_enable);
  */
 void mipi_lli_intr_disable(void)
 {
-               if (!g_lli || !g_lli->driver || !g_lli->driver->intr_disable)
-                               return;
+	if (!g_lli || !g_lli->driver || !g_lli->driver->intr_disable)
+		return;
 
-               g_lli->driver->intr_disable(g_lli);
+	g_lli->driver->intr_disable(g_lli);
 }
 EXPORT_SYMBOL(mipi_lli_intr_disable);
+
+/**
+ * mipi_lli_mask_sb_intr
+ */
+void mipi_lli_mask_sb_intr(bool flag)
+{
+	if (!g_lli || !g_lli->driver || !g_lli->driver->mask_sb_intr)
+		return;
+
+	g_lli->driver->mask_sb_intr(g_lli, flag);
+}
+EXPORT_SYMBOL(mipi_lli_mask_sb_intr);
 
 /**
  * mipi_lli_suspend must call by modem_if.

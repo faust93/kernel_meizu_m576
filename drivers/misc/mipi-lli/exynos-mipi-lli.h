@@ -264,4 +264,13 @@
 
 #define SIG_INT_MASK0			(0xFFFFFFFF)
 #define SIG_INT_MASK1			(0x00000000)
+
+#undef dev_info
+#undef dev_err
+#undef dev_dbg
+
+#define dev_err(dev, fmt, arg...) pr_err("lli: "fmt, ##arg)
+#define dev_info(dev, fmt, arg...) pr_info("lli: "fmt, ##arg)
+#define dev_dbg(dev, fmt, arg...) pr_debug("lli: "fmt, ##arg)
+
 #endif /* __DRIVERS_EXYNOS_MIPI_LLI_H */

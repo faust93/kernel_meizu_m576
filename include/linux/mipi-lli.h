@@ -15,12 +15,9 @@
 
 #include <linux/miscdevice.h>
 #include <linux/clk.h>
+#include <linux/platform_data/modem_debug.h>
 
-#ifdef CONFIG_LTE_MODEM_XMM7260
 #define MIPI_LLI_RESERVE_SIZE SZ_8M
-#else
-#define MIPI_LLI_RESERVE_SIZE SZ_4M
-#endif
 
 extern phys_addr_t lli_phys_addr;
 
@@ -139,11 +136,17 @@ struct mipi_lli {
 	struct mipi_lli_clks	clks;
 	struct mipi_lli_dump	dump;
 	struct work_struct	wq_print_dump;
-	struct work_struct	wq_sys_init;
-	struct workqueue_struct *wq;
+	struct work_struct      wq_sys_init;
+	struct workqueue_struct	*wq;
+
+#ifdef CONFIG_DEBUG_FS
+	struct dentry *debugfs_dir;
+	struct dentry *debugfs_dump;
+#endif
 
 	unsigned int		irq;		/* irq allocated */
 	unsigned int		irq_sig;	/* irq_sig allocated */
+	bool			irq_sig_active;
 	void __iomem		*regs;		/* device memory/io */
 	void __iomem		*remote_regs;	/* device memory/io */
 	void __iomem		*sys_regs;	/* device memory/io */
@@ -164,7 +167,7 @@ struct mipi_lli {
 	bool			is_clk_enabled;
 	bool			is_runtime_suspended;
 
-	enum mipi_lli_event	event;
+	enum mipi_lli_event     event;
 
 	struct notifier_block	lpa_nb;
 	struct mipi_lli_ipc_handler hd;
@@ -186,7 +189,8 @@ struct lli_driver {
 	int	(*debug_info)(struct mipi_lli *lli);
 
 	int	(*intr_enable)(struct mipi_lli *lli);
-	int     (*intr_disable)(struct mipi_lli *lli);
+	int	(*intr_disable)(struct mipi_lli *lli);
+	int	(*mask_sb_intr)(struct mipi_lli *lli, bool flag);
 
 	int	(*suspend)(struct mipi_lli *lli);
 	int	(*resume)(struct mipi_lli *lli);
@@ -220,5 +224,9 @@ extern void mipi_lli_reset(void);
 extern void mipi_lli_reload(void);
 extern void mipi_lli_suspend(void);
 extern void mipi_lli_resume(void);
+extern void mipi_lli_mask_sb_intr(bool);
+
+#define lli_err(dev, fmt, ...)	dev_err(dev, fmt, ##__VA_ARGS__)
+#define lli_info(dev, fmt, ...)	dev_info(dev, fmt, ##__VA_ARGS__)
 
 #endif /* __MIPI_LLI_H */

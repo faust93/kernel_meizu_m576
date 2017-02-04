@@ -619,9 +619,6 @@ static int mipi_lli_boot_spi_probe(struct spi_device *spi)
 		if (ret < 0)
 			goto err_setup;
 
-	} else {
-		ret = -ENODEV;
-		goto err_setup;
 	}
 
 	of_id = of_match_node(mipi_lli_boot_spi_match, dev->of_node);

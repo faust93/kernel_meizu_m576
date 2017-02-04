@@ -88,6 +88,9 @@ static u32 exynos_mphy_cal_ovtm_init(void *mphy_addr)
 	/* Masking DIF-P when enter H8 */
 	writel(0x21, mphy_addr + 0x37*4);
 
+	writel(0x0, mphy_addr + 0x8C*4);
+	writel(0x0, mphy_addr + 0x8D*4);
+
 	return 0;
 }
 
@@ -157,6 +160,7 @@ static u32 exynos_mphy_cal_pma_HS_G1A_init(void *pma_addr,
 		writel(0xF0, pma_addr + 0x17*4);
 	else /* get Ref_Clk from internal OSC or PLL */
 		writel(0x80, pma_addr + 0x17*4);
+
 	/* DIPD tuning 2014-09-18 for CTS test */
 	writel(0xE4, pma_addr + 0x31*4);
 	writel(0xE4, pma_addr + 0x32*4);
@@ -284,6 +288,9 @@ static u32 exynos_mphy_cal_pma_HS_G2A_init(void *pma_addr,
 	writel(0x81, pma_addr + 0x4D*4);
 	/* ------------- DIPD tuning 2014-02-21 ---- end  ---------------- */
 
+	writel(0x10, pma_addr + 0x4A*4);
+	writel(0x10, pma_addr + 0x5C*4);
+
 	return 0;
 }
 
@@ -347,6 +354,8 @@ static int exynos_mphy_cal_pma_init(void *pma_addr,
 	u32 cdr_locked;
 	u32 count = 0;
 
+	pr_debug("%s: %x\n", __func__, info);
+
 	gear = info & 0x7;
 	/* PWM: 0x10, HS: 0x20 */
 	if (info & 0x10)
@@ -405,6 +414,7 @@ static int exynos_mphy_cal_pma_init(void *pma_addr,
 	txfsmstate = exynos_mphy_get_tx_fsmstate();
 	rxfsmstate = exynos_mphy_get_rx_fsmstate();
 
+	pr_debug("%s: %x %x\n", __func__, txfsmstate, rxfsmstate);
 	/* in case of H8 Exit */
 	if ((txfsmstate != 1) && (rxfsmstate != 1)) {
 		/* check PLL locked */
