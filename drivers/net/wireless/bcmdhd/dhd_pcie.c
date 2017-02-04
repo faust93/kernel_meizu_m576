@@ -991,10 +991,14 @@ bool dhd_bus_watchdog(dhd_pub_t *dhd)
         }
 
 	if(current_level < 3 && false == status_bl1 && false == lcd_is_on){
+#ifdef CONFIG_EXYNOS_MARCH_DYNAMIC_CPU_HOTPLUG
 		wifi_cl1_get();
+#endif
 		status_bl1 = true;
 	}else if(current_level >= 3 && true == status_bl1){
+#ifdef CONFIG_EXYNOS_MARCH_DYNAMIC_CPU_HOTPLUG
 		wifi_cl1_release();
+#endif
 		status_bl1 = false;
 	}
 
