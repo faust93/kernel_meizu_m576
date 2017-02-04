@@ -49,6 +49,7 @@ struct gpio_button_data {
 	struct input_dev *input;
 	struct timer_list timer;
 	struct work_struct work;
+	struct workqueue_struct *workqueue;
 	unsigned int timer_debounce;	/* in msecs */
 	unsigned int irq;
 	spinlock_t lock;
@@ -447,7 +448,10 @@ static void gpio_keys_gpio_timer(unsigned long _data)
 {
 	struct gpio_button_data *bdata = (struct gpio_button_data *)_data;
 
-	schedule_work(&bdata->work);
+	if (bdata->workqueue)
+		queue_work(bdata->workqueue, &bdata->work);
+	else
+		schedule_work(&bdata->work);
 }
 
 static irqreturn_t gpio_keys_gpio_isr(int irq, void *dev_id)
@@ -561,6 +565,10 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 			}
 			bdata->irq = irq;
 		}
+
+		bdata->workqueue = alloc_workqueue("gpio-keys/highpri", WQ_HIGHPRI, 0);
+		if (!bdata->workqueue)
+			dev_err(dev, "failed to alloc own workqueue\n");
 
 		INIT_WORK(&bdata->work, gpio_keys_gpio_work_func);
 		setup_timer(&bdata->timer,
@@ -742,7 +750,7 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 
 		if (of_property_read_u32(pp, "debounce-interval",
 					 &button->debounce_interval))
-			button->debounce_interval = 5;
+			button->debounce_interval = 10;
 	}
 
 	if (pdata->nbuttons == 0) {
@@ -909,9 +917,15 @@ fail4:
     meizu_sysfslink_unregister(LINK_KOBJ_NAME);
 fail3:
 	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
-fail2:
-	while (--i >= 0)
-		gpio_remove_key(&ddata->data[i]);
+ fail2:
+	while (--i >= 0) {
+		struct gpio_button_data *bdata = &ddata->data[i];
+
+		if (bdata->workqueue)
+			destroy_workqueue(bdata->workqueue);
+
+		gpio_remove_key(bdata);
+	}
 #ifdef CONFIG_AUTO_SLEEP_WAKEUP_TEST
 	auto_sleep_wakeup_test_unregister_client(&ddata->auto_sleep_wakeup_test_notifier_block);
 #endif
@@ -937,8 +951,14 @@ static int gpio_keys_remove(struct platform_device *pdev)
 
 	device_init_wakeup(&pdev->dev, 0);
 
-	for (i = 0; i < ddata->pdata->nbuttons; i++)
-		gpio_remove_key(&ddata->data[i]);
+	for (i = 0; i < ddata->pdata->nbuttons; i++) {
+		struct gpio_button_data *bdata = &ddata->data[i];
+
+		if (bdata->workqueue)
+			destroy_workqueue(bdata->workqueue);
+
+		gpio_remove_key(bdata);
+	}
 
 #ifdef CONFIG_AUTO_SLEEP_WAKEUP_TEST
 	auto_sleep_wakeup_test_unregister_client(&ddata->auto_sleep_wakeup_test_notifier_block);
