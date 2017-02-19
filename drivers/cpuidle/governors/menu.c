@@ -120,8 +120,8 @@ enum {MENU_HRTIMER_STOP, MENU_HRTIMER_REPEAT, MENU_HRTIMER_GENERAL};
  * The C-state residency is so long that is is worthwhile to exit
  * from the shallow C-state and re-enter into a deeper C-state.
  */
-static unsigned int perfect_cstate_ms __read_mostly = 30;
-module_param(perfect_cstate_ms, uint, 0000);
+static unsigned int perfect_cstate_ms __read_mostly = 10;
+module_param(perfect_cstate_ms, uint, 0644);
 
 struct menu_device {
 	int		last_state_idx;
@@ -312,7 +312,7 @@ again:
 /* In some cases, idle should return RIGHT index to enter
  * correct idle states.
  */
-#undef CONFIG_SKIP_IDLE_CORRELATION
+#define CONFIG_SKIP_IDLE_CORRELATION
 
 /**
  * menu_select - selects the next idle state to enter
@@ -384,7 +384,7 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	 * We want to default to C1 (hlt), not to busy polling
 	 * unless the timer is happening really really soon.
 	 */
-	if (data->expected_us > 5 &&
+	if (data->expected_us > 20 &&
 	    !drv->states[CPUIDLE_DRIVER_STATE_START].disabled &&
 		dev->states_usage[CPUIDLE_DRIVER_STATE_START].disable == 0)
 		data->last_state_idx = CPUIDLE_DRIVER_STATE_START;
