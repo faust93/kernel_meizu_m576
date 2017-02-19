@@ -216,7 +216,9 @@ static inline bool is_cluster1_hotplugged(void) {return 0;}
 	#warning "Should define CONFIG_ARM_EXYNOS_(MP_)CPUFREQ\n"
 #endif
 #endif
+#ifdef CONFIG_EXYNOS_MARCH_DYNAMIC_CPU_HOTPLUG
 static inline int cluster1_cores_hotplug(bool out_flag) {return 0;}
 static inline int cluster0_core1_hotplug_in(bool in_flag) {return 0;}
 static inline void event_hotplug_in(void) {}
+#endif
 #endif /* __ARCH_CPUFREQ_H */
