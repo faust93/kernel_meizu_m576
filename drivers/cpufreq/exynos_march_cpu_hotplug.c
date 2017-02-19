@@ -49,7 +49,7 @@ static DEFINE_PER_CPU(struct cpu_load_info, cpuload);
 
 #define DEFAULT_MIN_CPUS_ONLINE        1
 #define DEFAULT_MAX_CPUS_ONLINE        8
-#define DEFAULT_MIN_UP_TIME            500
+#define DEFAULT_MIN_UP_TIME            300
 
 #define DEFAULT_NR_FSHIFT              3
 
@@ -75,35 +75,35 @@ module_param(min_cpu_boosted, uint, 0664);
 static unsigned int cpu_nr_run_threshold = CPU_NR_THRESHOLD;
 module_param(cpu_nr_run_threshold, uint, 0664);
 
-static unsigned int current_profile_no = 2;
+static unsigned int current_profile_no = 1;
 module_param(current_profile_no, uint, 0664);
 
-static unsigned int nr_run_thresholds_balanced[] = {
+static unsigned int nr_run_thresholds_high[] = {
+        100,
+        200,
         THREAD_CAPACITY * 1,
         THREAD_CAPACITY * 4,
         THREAD_CAPACITY * 8,
-        THREAD_CAPACITY * 15,
+        THREAD_CAPACITY * 10,
         THREAD_CAPACITY * 20,
-        THREAD_CAPACITY * 30,
-        THREAD_CAPACITY * 59,
-        THREAD_CAPACITY * 70,
+        THREAD_CAPACITY * 45,
 	UINT_MAX
 };
 
-static unsigned int nr_run_thresholds_cons[] = {
+static unsigned int nr_run_thresholds_balanced[] = {
+        100,
+        THREAD_CAPACITY,
         THREAD_CAPACITY * 3,
-        THREAD_CAPACITY * 6,
-        THREAD_CAPACITY * 11,
+        THREAD_CAPACITY * 7,
+        THREAD_CAPACITY * 12,
         THREAD_CAPACITY * 18,
-        THREAD_CAPACITY * 23,
-        THREAD_CAPACITY * 35,
-        THREAD_CAPACITY * 66,
-        THREAD_CAPACITY * 88,
+        THREAD_CAPACITY * 30,
+        THREAD_CAPACITY * 74,
 	UINT_MAX
 };
 
 static unsigned int nr_run_thresholds_eco[] = {
-        200,
+        100,
         THREAD_CAPACITY * 2,
         THREAD_CAPACITY * 4,
         THREAD_CAPACITY * 8,
@@ -115,9 +115,9 @@ static unsigned int nr_run_thresholds_disable[] = {
 };
 
 static unsigned int *nr_run_profiles[] = {
+	nr_run_thresholds_high,
 	nr_run_thresholds_balanced,
 	nr_run_thresholds_eco,
-	nr_run_thresholds_cons,
 	nr_run_thresholds_disable
 };
 
@@ -376,13 +376,13 @@ static void march_hotplug_monitor(unsigned long data)
 
 void wifi_cl1_get(void)
 {
-	if (pm_qos_request_active(&cluster1_num_max_qos))
-		pm_qos_update_request(&cluster1_num_max_qos, NR_CLUST1_CPUS);
+//	if (pm_qos_request_active(&cluster1_num_max_qos))
+//		pm_qos_update_request(&cluster1_num_max_qos, NR_CLUST1_CPUS);
 }
 void wifi_cl1_release(void)
 {
-	if (pm_qos_request_active(&cluster1_num_max_qos))
-		pm_qos_update_request(&cluster1_num_max_qos, lcd_is_on ? NR_CLUST1_CPUS : 0);
+//	if (pm_qos_request_active(&cluster1_num_max_qos))
+//		pm_qos_update_request(&cluster1_num_max_qos, lcd_is_on ? NR_CLUST1_CPUS : 0);
 }
 #ifdef CONFIG_BCMDHD_PCIE
 extern int current_level;
@@ -596,30 +596,17 @@ static int __ref change_core_num_cluster0(int target_num, int use_target)
 	return ret;
 }
 
-static __ref int change_core_num_cluster1(int cluster_on_off, int hmp_booster)
+static __ref int change_core_num_cluster1(int cluster_on_off)
 {
 	int ret = 0;
 	int cur_num, val, i = 0; //, l_nr_threshold = 0;
-	int max_limit = 0xff, min_limit = 0xff;
 	int target_num = 0;
         struct cpu_load_info *pcpu;
 
 	mutex_lock(&cluster1_hotplug_lock);
 	cur_num = get_online_cpu_num_on_cluster(CL_ONE);
 
-	max_limit = (int)pm_qos_request(PM_QOS_CLUSTER1_NUM_MAX);
-	min_limit = (int)pm_qos_request(PM_QOS_CLUSTER1_NUM_MIN);
-
-	if (hmp_booster != 0 &&  max_limit > 0) {
-		target_num = max_limit;
-	} else {
-		target_num = max(cluster_on_off, min_limit);
-	}
-
-	if (target_num != cur_num) {
-		if (log_onoff) 
-			printk("[%s] cur:%d target:%d max:%d min:%d\n", __func__, cur_num, target_num, max_limit,min_limit);
-	}
+	target_num = cluster_on_off;
 
 	if (target_num > cur_num) {
 		val = target_num - cur_num;
@@ -668,9 +655,9 @@ static void event_hotplug_cluster1_work(struct work_struct *work)
 	mutex_lock(&march_thread_lock);
 	target_num = (int)pm_qos_request(PM_QOS_CLUSTER1_NUM_MIN);
 	if (target_num == 0)
-		change_core_num_cluster1(0,0);
+		change_core_num_cluster1(0);
 	else
-		change_core_num_cluster1(1,0);
+		change_core_num_cluster1(1);
 	mutex_unlock(&march_thread_lock);
 }
 
@@ -803,11 +790,11 @@ static unsigned int calculate_thread_stats(void)
 	unsigned int *current_profile = nr_run_profiles[current_profile_no];
 
 	if(current_profile_no == 0)
-		threshold_size = ARRAY_SIZE(nr_run_thresholds_balanced);
+		threshold_size = ARRAY_SIZE(nr_run_thresholds_high);
 	else if(current_profile_no == 1)
-		threshold_size = ARRAY_SIZE(nr_run_thresholds_eco);
+		threshold_size = ARRAY_SIZE(nr_run_thresholds_balanced);
 	else if(current_profile_no == 2)
-		threshold_size = ARRAY_SIZE(nr_run_thresholds_cons);
+		threshold_size = ARRAY_SIZE(nr_run_thresholds_eco);
 
 	for (nr_run = 1; nr_run < threshold_size; nr_run++) {
 		unsigned int nr_threshold;
@@ -863,14 +850,15 @@ static int on_run(void *data)
 
                 update_per_cpu_stat();
 		
-		if (get_cur_cluster1_booster_value() > 0 && cl1_booster != 0 && lcd_is_on) {
+		if ((get_cur_cluster1_booster_value() > 0 && cl1_booster != 0 && lcd_is_on) || (current_profile_no == 0)) {
                     if(cluster1_core_num == 0)
-			change_core_num_cluster1(min_cpu_boosted, 0);
+			change_core_num_cluster1(min_cpu_boosted);
                     else
-			change_core_num_cluster1(cluster1_core_num, 0);
-			decrease_cluster1_booster();
+			change_core_num_cluster1(cluster1_core_num);
+
+                  decrease_cluster1_booster();
 		} else if (cluster1_core_num != get_cur_cluster1_core_num()) {
-			change_core_num_cluster1(cluster1_core_num, 0);
+			change_core_num_cluster1(cluster1_core_num);
 		}
 
 		if (cluster0_core_num != get_cur_cluster0_core_num()) {
