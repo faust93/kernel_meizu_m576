@@ -50,7 +50,7 @@ struct booster_req {
 
 static bool	touched = false;
 static wait_queue_head_t waitq_input;
-static bool booster_enabled = false;
+static bool booster_enabled = true;
 
 static DEFINE_MUTEX(janeps_mtx); // Critical Section for Process.
 static spinlock_t janeps_lock;
