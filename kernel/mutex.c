@@ -152,8 +152,8 @@ static void mspin_unlock(struct mspin_node **lock, struct mspin_node *node)
 		if (cmpxchg(lock, node, NULL) == node)
 			return;
 		/* Wait until the next pointer is set */
-		while (!(next = ACCESS_ONCE(node->next)))
-			arch_mutex_cpu_relax();
+		while (!(next = cpu_relaxed_read_long(&(node->next))))
+			cpu_read_relax();
 	}
 	ACCESS_ONCE(next->locked) = 1;
 	smp_wmb();
