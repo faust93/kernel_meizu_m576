@@ -419,8 +419,8 @@ static void dispatch_move_event(fpc1020_data_t *fpc1020, int x, int y, int finge
 /* -------------------------------------------------------------------- */
 static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int finger_status)
 {
-	const int THRESHOLD_RANGE_TAP = 500000;
-        const int THRESHOLD_RANGE_MIN_TAP = 60000;
+	const int THRESHOLD_RANGE_TAP = 525000;
+        const int THRESHOLD_RANGE_MIN_TAP = 664000;
 	//const unsigned long THRESHOLD_DURATION_TAP = 3000;//350;
 	const unsigned long THRESHOLD_DURATION_TAP = 1000;/*long press threshold*/
 	const unsigned long THRESHOLD_DURATION_DTAP = 850;
