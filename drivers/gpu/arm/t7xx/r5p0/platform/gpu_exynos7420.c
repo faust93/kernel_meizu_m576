@@ -108,7 +108,7 @@ static gpu_attribute gpu_config_attributes[] = {
 	{GPU_TEMP_THROTTLING3, 350},
 	{GPU_TEMP_THROTTLING4, 266},
 	{GPU_TEMP_TRIPPING, 266},
-	{GPU_POWER_COEFF, 443}, /* all core on param */
+	{GPU_POWER_COEFF, 900}, /* all core on param */
 	{GPU_DVFS_TIME_INTERVAL, 5},
 	{GPU_DEFAULT_WAKEUP_LOCK, 1},
 	{GPU_BUS_DEVFREQ, 1},
