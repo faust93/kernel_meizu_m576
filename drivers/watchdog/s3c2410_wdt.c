@@ -62,7 +62,7 @@ static bool nowayout	= WATCHDOG_NOWAYOUT;
 static int tmr_margin	= CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME;
 static int tmr_atboot	= CONFIG_S3C2410_WATCHDOG_ATBOOT;
 static int soft_noboot	= CONFIG_S3C2410_WATCHDOG_IRQ ? 1 : 0;
-static int debug = 1;
+static int debug = 0;
 
 
 /************************* MEIZU BSP *******************************/
@@ -459,15 +459,12 @@ static int kicker_thread(void *arg)
 				/* only process WDT info if thread-x is on cpu-x */
 				spin_lock(&wdk_lock);
 				local_bit = kick_bit;
-				printk("[WDK] local_bit:0x%x, cpu:%d\n", local_bit, cpu);
 
 				if ((local_bit & (1 << cpu)) == 0) {
 					local_bit |= (1 << cpu);  //kick the cpu bit
 				}
 
-				printk("[WDK] local_bit:0x%x, cpu:%d, check bit:0x%x, RT[%lld]\n", local_bit, cpu, wk_check_kick_bit(), sched_clock());
 				if (local_bit == wk_check_kick_bit()) {
-					printk("[WDK]: kick WDT, RT[%lld]\n", sched_clock());
 					//mtk_wdt_restart(WD_TYPE_NORMAL);	/* for KICK external wdt */
 					s3c2410wdt_keepalive(&s3c2410_wdd);
 					local_bit = 0;
@@ -478,12 +475,6 @@ static int kicker_thread(void *arg)
 					rtc_time_to_tm(tv.tv_sec, &tm);
 					tv_android.tv_sec -= sys_tz.tz_minuteswest * 60;
 					rtc_time_to_tm(tv_android.tv_sec, &tm_android);
-					printk("[WDK][thread:%d][RT:%lld] %d-%02d-%02d %02d:%02d:%02d.%u UTC; android time %d-%02d-%02d %02d:%02d:%02d.%03d\n",
-					     current->pid, sched_clock(), tm.tm_year + 1900, tm.tm_mon + 1,
-					     tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, (unsigned int)tv.tv_usec,
-					     tm_android.tm_year + 1900, tm_android.tm_mon + 1, tm_android.tm_mday,
-					     tm_android.tm_hour, tm_android.tm_min, tm_android.tm_sec,
-					     (unsigned int)tv_android.tv_usec);
 				}
 				kick_bit = local_bit;
 				spin_unlock(&wdk_lock);
@@ -493,7 +484,6 @@ static int kicker_thread(void *arg)
 		}
 		msleep((g_kinterval) * 1000);
 	}
-	printk(KERN_EMERG "[WDK] WDT kicker thread stop, cpu:%d, pid:%d\n", cpu, current->pid);
 
 	return 0;
 }
@@ -509,7 +499,6 @@ void kicker_cpu_bind(int cpu)
 		//kthread_bind(wk_tsk[cpu], cpu);
 		WARN_ON_ONCE(set_cpus_allowed_ptr(wk_tsk[cpu], cpumask_of(cpu)) < 0);
 
-		printk("[WDK] bind kicker thread[%d] to cpu[%d]\n",wk_tsk[cpu]->pid, cpu);
 		wake_up_process(wk_tsk[cpu]);
 	}
 }
@@ -540,7 +529,6 @@ void wk_start_kick_cpu(int cpu)
 		printk("[WDK] wk_task[%d] is NULL\n", cpu);
 	} else {
 		kthread_bind(wk_tsk[cpu], cpu);
-		printk("[WDK] bind thread[%d] to cpu[%d]\n", wk_tsk[cpu]->pid, cpu);
 		wake_up_process(wk_tsk[cpu]);
 	}
 }
@@ -618,7 +606,6 @@ static int __cpuinit wk_cpu_callback(struct notifier_block *nfb, unsigned long a
 		{
 		   kicker_cpu_bind(hotcpu);
 		}
-		printk("[WDK] cpu %d plug on kick wdt. cpus_kick_bit=0x%x\n", hotcpu,cpus_kick_bit);
 		s3c2410wdt_keepalive(&s3c2410_wdd);
 		break;
 #ifdef CONFIG_HOTPLUG_CPU
@@ -628,7 +615,6 @@ static int __cpuinit wk_cpu_callback(struct notifier_block *nfb, unsigned long a
 	case CPU_DEAD_FROZEN:
 		s3c2410wdt_keepalive(&s3c2410_wdd);
 		wk_cpu_update_bit_flag(hotcpu, 0);
-		printk("[WDK] cpu %d plug off, kick wdt. cpus_kick_bit=0x%x\n", hotcpu,cpus_kick_bit);
 		break;
 #endif
 	default:
@@ -658,19 +644,16 @@ static int __init init_wk(void)
 		if(cpu_online(i))
 		{
 			wk_cpu_update_bit_flag(i, 1);
-			printk("[WDK] init cpu online %d\n",i);
 		}
 		else
 		{
 			wk_cpu_update_bit_flag(i, 0);
-			printk("[WDK] init cpu offline %d\n",i);
 		}
 	}
 	//mtk_wdt_restart(WD_TYPE_NORMAL);	/* for KICK external wdt */
 	s3c2410wdt_keepalive(&s3c2410_wdd);
 
 	cpu_hotplug_enable();
-	printk("[WDK] init_wk done late_initcall cpus_kick_bit=0x%x -----\n", cpus_kick_bit);
 
 	return 0;
 }
@@ -976,7 +959,7 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
 	//init_wk();
 
 	/* MEIZU BSP WDT test */
-	init_wdt_test();
+	//init_wdt_test();
 
 	return 0;
 

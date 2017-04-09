@@ -407,9 +407,8 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 		return;
 
         if (!fts_tp_wl && !strcmp(ws->name, "fts_tp")) {
-        pr_info("wakeup source fts_tp activate skipped\n");
                 return;
-                    }
+        }
 
 	/*
 	 * active wakeup source should bring the system
