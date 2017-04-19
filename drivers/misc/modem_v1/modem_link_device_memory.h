@@ -337,7 +337,6 @@ int copy_circ_to_user(void __user *dst, void *src, u32 qsize, u32 out, u32 len);
 int copy_user_to_circ(void *dst, void __user *src, u32 qsize, u32 in, u32 len);
 
 #define MAX_MEM_LOG_CNT	8192
-#define MAX_TRACE_SIZE	1024
 
 struct mem_status {
 	/* Timestamp */
