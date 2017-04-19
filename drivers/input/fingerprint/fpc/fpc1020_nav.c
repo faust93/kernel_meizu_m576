@@ -318,7 +318,10 @@ static void fpc1020_timer_handle(unsigned long arg)
 			FPC1020_KEY_FINGER_TOUCH, 0);
 	    input_sync(fpc1020->input_dev);
 	    fpc1020->nav.tap_status = FNGR_ST_LOST;
-            pr_info("finger timer single click\n");
+        } else if(fpc1020->nav.tap_status == FNGR_ST_HOLD) {
+            input_report_key(fpc1020->input_dev, FPC1020_KEY_FINGER_TOUCH, 0);
+	    input_sync(fpc1020->input_dev);
+	    fpc1020->nav.tap_status = FNGR_ST_LOST;
         }
 
 }
@@ -407,7 +410,6 @@ static void dispatch_move_event(fpc1020_data_t *fpc1020, int x, int y, int finge
                 case FNGR_ST_HOLD:
 			input_report_key(fpc1020->input_dev, FPC1020_KEY_FINGER_TOUCH, 1);
 			input_sync(fpc1020->input_dev);
-                        pr_info("[FPC/DPAD] report long press\n");
                         break;
 
 		default:
@@ -419,8 +421,8 @@ static void dispatch_move_event(fpc1020_data_t *fpc1020, int x, int y, int finge
 /* -------------------------------------------------------------------- */
 static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int finger_status)
 {
-	const int THRESHOLD_RANGE_TAP = 525000;
-        const int THRESHOLD_RANGE_MIN_TAP = 664000;
+	const int THRESHOLD_RANGE_TAP = 500000;
+        const int THRESHOLD_RANGE_MIN_TAP = 60000;
 	//const unsigned long THRESHOLD_DURATION_TAP = 3000;//350;
 	const unsigned long THRESHOLD_DURATION_TAP = 1000;/*long press threshold*/
 	const unsigned long THRESHOLD_DURATION_DTAP = 850;
@@ -438,19 +440,25 @@ static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int fing
 
 	if ( tick_down > 0 ) {
 		duration = tick_curr - tick_down;
+                if ( dx == -64 ) {
+                    dx = 0;
+                    dy = 0;
+                }
 		deviation_x += dx;
 		deviation_y += dy;
 		deviation =  deviation_x * deviation_x + deviation_y * deviation_y;
+
+		//printk("[FPC] %s fpc deviation: %d\n", __func__,deviation);
 
 		if ( deviation > THRESHOLD_RANGE_TAP ) {
 			deviation_x = 0;
 			deviation_y = 0;
 			tick_down = 0;
 			fpc1020->nav.tap_status = -1;
-			printk("[FPC] %s:throw the events\n", __func__);
+			//printk("[FPC] %s:throw the events\n", __func__);
 			if (duration > THRESHOLD_DURATION_TAP)
                         {
-                            printk("[FPC] %s: prepare long press because of outside\n", __func__);
+                            //printk("[FPC] %s: prepare long press because of outside\n", __func__);
                             filtered_finger_status = FNGR_ST_HOLD;// FNGR_ST_L_HOLD;
                         }
 		}
@@ -499,15 +507,20 @@ static void process_navi_event(fpc1020_data_t *fpc1020, int dx, int dy, int fing
                     {
                         printk("[FPC] %s: prepare long press\n", __func__);
                         filtered_finger_status = FNGR_ST_HOLD;// FNGR_ST_L_HOLD;
-                        fpc1020->nav.tap_status = -1;
+                        fpc1020->nav.tap_status = FNGR_ST_HOLD;
                         tick_down = 0;
                         deviation_x = 0;
                         deviation_y = 0;
+                        if(!timer_pending(&s_timer)){
+                            init_timer(&s_timer);
+                            setup_timer(&s_timer, &fpc1020_timer_handle,(unsigned long)fpc1020);
+                            mod_timer(&s_timer, jiffies + 90);
+                        }
                     }
 	        }
 
        }
-	dev_info(&fpc1020->spi->dev, "[INFO] mode[%d] dx : %d / dy : %d\n", 1, dx, dy);
+	// dev_info(&fpc1020->spi->dev, "[INFO] mode[%d] dx : %d / dy : %d\n", 1, dx, dy);
 
 	switch(fpc1020->nav.input_mode) {
 		case FPC1020_INPUTMODE_TRACKPAD :
@@ -1059,7 +1072,7 @@ int fpc1020_input_task(fpc1020_data_t *fpc1020)
 			sumX += dx;
 			sumY += dy;
 
-                        //pr_info("[FPC] get_movement dx=%d, dy=%d, sumx=%d, sumy=%d\n", dx, dy, sumX, sumY);
+                        pr_info("[FPC] get_movement dx=%d, dy=%d, sumx=%d, sumy=%d\n", dx, dy, sumX, sumY);
 
 			diffTime = abs(jiffies - fpc1020->nav.time);
 			if(diffTime > 0) {

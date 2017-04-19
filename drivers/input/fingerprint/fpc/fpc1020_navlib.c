@@ -16,7 +16,7 @@
 #define MAXDX (64 / NAV_IMG_COL_MASK)
 
 // Threshold of how different the best match may be, if the best match is more different than this value then we consider the movement to be nonexistant
-#define NORM_MIN_DIFF_THRESHOLD 20
+#define NORM_MIN_DIFF_THRESHOLD 10
 
 static int calculate_diff(const u8* p_curr, const u8* p_prev, int cmp_width, int cmp_height, int diff_limit)
 {
